@@ -3,7 +3,6 @@ import type { AircraftProfile, PluginSettings, SharedDependencies } from '../typ
 import { getSettings, saveSettings } from '../store/settings-store';
 import { deleteAircraft, listAircraft, saveAircraft } from '../store/aircraft-store';
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
-import { createRegionPicker } from './region-picker';
 
 export function createSettingsPanel(Shared: SharedDependencies) {
   const {
@@ -19,14 +18,12 @@ export function createSettingsPanel(Shared: SharedDependencies) {
     Input,
   } = Shared;
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
-  const RegionPicker = createRegionPicker(Shared);
 
   const SettingsPanel: FC = () => {
     const [settings, setSettings] = useState<PluginSettings | null>(null);
     const [aircraft, setAircraft] = useState<AircraftProfile[]>([]);
     const [editing, setEditing] = useState<AircraftProfile | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
-    const [regionOpen, setRegionOpen] = useState(false);
 
     const refresh = async () => {
       const [s, a] = await Promise.all([getSettings(), listAircraft()]);
@@ -101,10 +98,15 @@ export function createSettingsPanel(Shared: SharedDependencies) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Map regions</CardTitle>
+            <CardTitle>Basemap</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => setRegionOpen(true)}>Manage map regions</Button>
+            <div className="text-sm text-muted-foreground">
+              Using <a className="underline" href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> vector tiles online (OpenStreetMap data, ODbL).
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              Offline map regions are planned for a future release. Airport search and navlog work offline once the airport database is downloaded.
+            </div>
           </CardContent>
         </Card>
 
@@ -165,11 +167,6 @@ export function createSettingsPanel(Shared: SharedDependencies) {
             await saveAircraft(a);
             await refresh();
           }}
-        />
-
-        <RegionPicker
-          open={regionOpen}
-          onClose={() => setRegionOpen(false)}
         />
       </div>
     );

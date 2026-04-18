@@ -9,7 +9,6 @@ import {
   type FlightPlannerStore,
 } from '../hooks/use-flight-planner-store';
 import { isAirportsDbInstalled } from '../data/first-run-download';
-import { listInstalledRegions } from '../store/settings-store';
 
 import { createPlanHeader } from './plan-header';
 import { createAircraftPicker } from './aircraft-picker';
@@ -20,7 +19,6 @@ import { createNavlog } from './navlog';
 import { createExportBar } from './export-bar';
 import { createPlansList } from './plans-list';
 import { createFirstRunModal } from './first-run-modal';
-import { createRegionPicker } from './region-picker';
 import { createMapViewer } from '../map/map-viewer';
 
 export function createFlightPlannerPage(Shared: SharedDependencies) {
@@ -36,7 +34,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const ExportBar = createExportBar(Shared);
   const PlansList = createPlansList(Shared);
   const FirstRunModal = createFirstRunModal(Shared);
-  const RegionPicker = createRegionPicker(Shared);
   const MapViewer = createMapViewer(Shared);
 
   const Inner: FC = () => {
@@ -61,19 +58,11 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingAircraft, setEditingAircraft] = useState<AircraftProfile | null>(null);
     const [firstRunOpen, setFirstRunOpen] = useState(false);
-    const [regionPickerOpen, setRegionPickerOpen] = useState(false);
 
     useEffect(() => {
       (async () => {
-        const [dbInstalled, regions] = await Promise.all([
-          isAirportsDbInstalled(),
-          listInstalledRegions(),
-        ]);
-        if (!dbInstalled) {
-          setFirstRunOpen(true);
-        } else if (regions.length === 0) {
-          setRegionPickerOpen(true);
-        }
+        const dbInstalled = await isAirportsDbInstalled();
+        if (!dbInstalled) setFirstRunOpen(true);
       })();
     }, []);
 
@@ -180,14 +169,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
           <div className="flex-1 min-h-0 relative">
             <MapViewer plan={plan} />
-            <div className="absolute top-2 right-2">
-              <button
-                className="text-xs bg-background border rounded px-2 py-1 shadow hover:bg-accent"
-                onClick={() => setRegionPickerOpen(true)}
-              >
-                Map regions
-              </button>
-            </div>
           </div>
         </div>
 
@@ -204,18 +185,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
         <FirstRunModal
           open={firstRunOpen}
-          onClose={() => {
-            setFirstRunOpen(false);
-            void (async () => {
-              const regions = await listInstalledRegions();
-              if (regions.length === 0) setRegionPickerOpen(true);
-            })();
-          }}
-        />
-
-        <RegionPicker
-          open={regionPickerOpen}
-          onClose={() => setRegionPickerOpen(false)}
+          onClose={() => setFirstRunOpen(false)}
         />
       </div>
     );

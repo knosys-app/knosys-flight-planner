@@ -19,59 +19,17 @@ export const OPFS_ROOT_DIR = 'flight-planner';
 export const OPFS_AIRPORTS_DB = 'airports.sqlite';
 export const OPFS_REGIONS_DIR = 'regions';
 
-// Default PMTiles region manifest. URLs point at Protomaps' daily-updated
-// regional extracts (ODbL). Sizes are approximate.
-export const PMTILES_REGIONS = [
-  {
-    id: 'na',
-    name: 'North America',
-    url: 'https://build.protomaps.com/20240101.pmtiles',
-    sizeMb: 1400,
-    note: 'US + Canada + Mexico vector tiles',
-  },
-  {
-    id: 'eu',
-    name: 'Europe',
-    url: 'https://build.protomaps.com/eu-20240101.pmtiles',
-    sizeMb: 1100,
-    note: 'All European countries',
-  },
-  {
-    id: 'sa',
-    name: 'South America',
-    url: 'https://build.protomaps.com/sa-20240101.pmtiles',
-    sizeMb: 700,
-    note: 'All South American countries',
-  },
-  {
-    id: 'as',
-    name: 'Asia',
-    url: 'https://build.protomaps.com/as-20240101.pmtiles',
-    sizeMb: 1800,
-    note: 'All Asian countries',
-  },
-  {
-    id: 'af',
-    name: 'Africa',
-    url: 'https://build.protomaps.com/af-20240101.pmtiles',
-    sizeMb: 800,
-    note: 'All African countries',
-  },
-  {
-    id: 'oc',
-    name: 'Oceania',
-    url: 'https://build.protomaps.com/oc-20240101.pmtiles',
-    sizeMb: 400,
-    note: 'Australia, NZ, Pacific islands',
-  },
-  {
-    id: 'world-low',
-    name: 'Global (low zoom, ~150 MB)',
-    url: 'https://build.protomaps.com/world-low-20240101.pmtiles',
-    sizeMb: 150,
-    note: 'Global coverage, zoom 0\u20137 only',
-  },
-] as const;
+// v1 uses OpenFreeMap's hosted vector-tile basemap — CORS-enabled, no API
+// key, unlimited free use, ODbL license. MapLibre loads the style JSON
+// which in turn references their tile endpoints. Attribution is required
+// and handled by MapLibre's AttributionControl (see map-viewer.tsx).
+//
+// EXTENSIBILITY: true offline maps are planned for v1.1 via PMTiles region
+// downloads to OPFS. The pmtiles-protocol / pmtiles-storage / region-picker
+// modules are scaffolded but not wired into v1.
+export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+export const MAP_ATTRIBUTION =
+  '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 // Airport database URL. Served from raw.githubusercontent.com because
 // github.com/releases/download/* doesn't send CORS headers and Electron's
