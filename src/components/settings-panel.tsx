@@ -2,7 +2,9 @@ import type { FC } from 'react';
 import type { AircraftProfile, PluginSettings, SharedDependencies } from '../types';
 import { getSettings, saveSettings } from '../store/settings-store';
 import { deleteAircraft, listAircraft, saveAircraft } from '../store/aircraft-store';
+import { getAirportsDbSize, isAirportsDbInstalled } from '../data/first-run-download';
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
+import { createFirstRunModal } from './first-run-modal';
 
 export function createSettingsPanel(Shared: SharedDependencies) {
   const {
@@ -18,17 +20,28 @@ export function createSettingsPanel(Shared: SharedDependencies) {
     Input,
   } = Shared;
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
+  const AirportDbModal = createFirstRunModal(Shared);
 
   const SettingsPanel: FC = () => {
     const [settings, setSettings] = useState<PluginSettings | null>(null);
     const [aircraft, setAircraft] = useState<AircraftProfile[]>([]);
     const [editing, setEditing] = useState<AircraftProfile | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
+    const [dbModalOpen, setDbModalOpen] = useState(false);
+    const [dbInstalled, setDbInstalled] = useState(false);
+    const [dbSizeBytes, setDbSizeBytes] = useState<number | null>(null);
 
     const refresh = async () => {
-      const [s, a] = await Promise.all([getSettings(), listAircraft()]);
+      const [s, a, installed, size] = await Promise.all([
+        getSettings(),
+        listAircraft(),
+        isAirportsDbInstalled(),
+        getAirportsDbSize(),
+      ]);
       setSettings(s);
       setAircraft(a);
+      setDbInstalled(installed);
+      setDbSizeBytes(size);
     };
 
     useEffect(() => {
@@ -92,6 +105,41 @@ export function createSettingsPanel(Shared: SharedDependencies) {
                   })
                 }
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Airport database</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm">
+                {dbInstalled ? (
+                  <>
+                    <div className="text-green-600">✓ Installed</div>
+                    <div className="text-xs text-muted-foreground">
+                      {dbSizeBytes != null
+                        ? `${(dbSizeBytes / 1_000_000).toFixed(1)} MB`
+                        : 'size unknown'}
+                      {settings.airportsDbInstalledAt
+                        ? ` · ${new Date(settings.airportsDbInstalledAt).toLocaleDateString()}`
+                        : ''}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-medium">Not installed</div>
+                    <div className="text-xs text-muted-foreground">
+                      Airport search and navlog require this ~18 MB database.
+                    </div>
+                  </>
+                )}
+              </div>
+              <Button variant={dbInstalled ? 'outline' : 'default'} onClick={() => setDbModalOpen(true)}>
+                {dbInstalled ? 'Manage' : 'Install'}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -166,6 +214,14 @@ export function createSettingsPanel(Shared: SharedDependencies) {
           onSave={async (a) => {
             await saveAircraft(a);
             await refresh();
+          }}
+        />
+
+        <AirportDbModal
+          open={dbModalOpen}
+          onClose={() => {
+            setDbModalOpen(false);
+            void refresh();
           }}
         />
       </div>

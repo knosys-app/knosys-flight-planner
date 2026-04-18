@@ -1,5 +1,5 @@
 import { AIRPORTS_DB_URL, OPFS_AIRPORTS_DB } from '../constants';
-import { fileSize, readFileBytes, writeStream } from './opfs';
+import { deleteFile, fileSize, readFileBytes, writeStream } from './opfs';
 
 const AIRPORTS_DB_PATH = [OPFS_AIRPORTS_DB];
 
@@ -8,8 +8,16 @@ export async function isAirportsDbInstalled(): Promise<boolean> {
   return size !== null && size > 0;
 }
 
+export async function getAirportsDbSize(): Promise<number | null> {
+  return fileSize(AIRPORTS_DB_PATH);
+}
+
 export async function loadAirportsDb(): Promise<Uint8Array | null> {
   return readFileBytes(AIRPORTS_DB_PATH);
+}
+
+export async function deleteAirportsDb(): Promise<void> {
+  await deleteFile(AIRPORTS_DB_PATH);
 }
 
 export interface DownloadProgress {
