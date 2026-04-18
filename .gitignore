@@ -1,0 +1,13 @@
+node_modules
+dist
+main.js.map
+data/cache
+data/airports.sqlite
+data/airports.meta.json
+.DS_Store
+*.log
+.vite
+coverage
+
+# main.js and styles.css ARE checked in \u2014 the Knosys installer's main-branch
+# fallback reads them from the repo root. Releases remain the primary path.

@@ -1,0 +1,11 @@
+{
+  "id": "knosys-flight-planner",
+  "name": "Flight Planner",
+  "version": "0.1.0",
+  "description": "Offline VFR flight planner for GA pilots \u2014 routes, navlog, aircraft profiles, exports",
+  "author": "knosys-app",
+  "authorUrl": "https://github.com/knosys-app",
+  "minKnosysVersion": "1.0.0",
+  "permissions": ["storage", "network", "core:locations"],
+  "main": "main.js"
+}
