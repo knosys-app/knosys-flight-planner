@@ -59,12 +59,13 @@ export default defineConfig({
       fileName: () => 'main.js',
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      // Only react / react-dom are resolvable by the plugin loader's
+      // require() stub. react/jsx-runtime is NOT \u2014 bundle it inline.
+      external: ['react', 'react-dom'],
       output: {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
-          'react/jsx-runtime': 'React',
         },
         inlineDynamicImports: true,
       },
