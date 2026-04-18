@@ -26,6 +26,24 @@ export interface PluginUIAPI {
   showToast: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
+export interface PluginNetworkFetchInit {
+  method?: 'GET' | 'POST' | 'HEAD';
+  headers?: Record<string, string>;
+  body?: ArrayBuffer | string;
+  timeoutMs?: number;
+}
+
+export interface PluginNetworkFetchResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: ArrayBuffer;
+}
+
+export interface PluginNetworkAPI {
+  fetch: (url: string, init?: PluginNetworkFetchInit) => Promise<PluginNetworkFetchResponse>;
+}
+
 export interface PluginAPI {
   pluginId: string;
   permissions: string[];
@@ -33,6 +51,7 @@ export interface PluginAPI {
   storage: PluginStorageAPI;
   core: PluginCoreAPI;
   ui: PluginUIAPI;
+  network: PluginNetworkAPI;
 }
 
 export interface SharedDependencies {

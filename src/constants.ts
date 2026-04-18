@@ -11,6 +11,9 @@ export const STORAGE_KEYS = {
   aircraft: (id: string) => `aircraft:${id}`,
   settings: 'settings',
   mapRegionsInstalled: 'map-regions-installed',
+  mapRegionsIndex: 'map-regions-index',
+  mapRegion: (id: string) => `map-region:${id}`,
+  mapSource: 'map-source',
   schemaVersion: 'schema-version',
   firstRunComplete: 'first-run-complete',
 } as const;
@@ -19,17 +22,41 @@ export const OPFS_ROOT_DIR = 'flight-planner';
 export const OPFS_AIRPORTS_DB = 'airports.sqlite';
 export const OPFS_REGIONS_DIR = 'regions';
 
-// v1 uses OpenFreeMap's hosted vector-tile basemap — CORS-enabled, no API
-// key, unlimited free use, ODbL license. MapLibre loads the style JSON
-// which in turn references their tile endpoints. Attribution is required
-// and handled by MapLibre's AttributionControl (see map-viewer.tsx).
-//
-// EXTENSIBILITY: true offline maps are planned for v1.1 via PMTiles region
-// downloads to OPFS. The pmtiles-protocol / pmtiles-storage / region-picker
-// modules are scaffolded but not wired into v1.
-export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+// v1.1 maps: range-read Protomaps daily planet PMTile via api.network.fetch
+// (bypasses CORS) with OPFS tile cache. Style JSON + sprites + glyphs come
+// from protomaps.github.io (CORS-enabled). Only the PMTile URL needs the
+// main-process proxy.
+export const PROTOMAPS_URL_PATTERN = 'https://build.protomaps.com/{date}.pmtiles';
+export const PROTOMAPS_STYLE_URL =
+  'https://protomaps.github.io/basemaps-assets/styles/v4/light.json';
 export const MAP_ATTRIBUTION =
-  '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  '<a href="https://protomaps.com">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+export const MAP_CACHE_DIR = 'map-cache';
+export const MAP_TILES_SUBDIR = 'tiles';
+
+// Preset bboxes exposed in the region picker. [west, south, east, north]
+// in degrees. Values chosen for practical GA planning areas.
+export const PRESET_REGIONS: Array<{
+  id: string;
+  name: string;
+  bbox: [number, number, number, number];
+}> = [
+  { id: 'us', name: 'Continental US', bbox: [-125, 24, -66, 50] },
+  { id: 'na', name: 'North America',  bbox: [-170, 14, -50, 72] },
+  { id: 'eu', name: 'Europe',         bbox: [-10, 35, 40, 71] },
+  { id: 'sa', name: 'South America',  bbox: [-82, -55, -35, 13] },
+  { id: 'as', name: 'Asia',           bbox: [60, 5, 150, 55] },
+  { id: 'af', name: 'Africa',         bbox: [-18, -35, 52, 38] },
+  { id: 'oc', name: 'Oceania',        bbox: [110, -47, 180, 0] },
+];
+
+export const ZOOM_PRESETS = {
+  low:    { min: 0, max: 8,  label: 'Low — continent + en-route' },
+  medium: { min: 0, max: 10, label: 'Medium — adds airport areas' },
+  high:   { min: 0, max: 12, label: 'High — adds airport detail' },
+} as const;
+
+export type ZoomPresetKey = keyof typeof ZOOM_PRESETS;
 
 // Airport database URL. Served from raw.githubusercontent.com because
 // github.com/releases/download/* doesn't send CORS headers and Electron's

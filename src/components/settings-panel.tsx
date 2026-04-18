@@ -5,6 +5,7 @@ import { deleteAircraft, listAircraft, saveAircraft } from '../store/aircraft-st
 import { getAirportsDbSize, isAirportsDbInstalled } from '../data/first-run-download';
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
 import { createFirstRunModal } from './first-run-modal';
+import { createMapCacheCard } from './map-cache-card';
 
 export function createSettingsPanel(Shared: SharedDependencies) {
   const {
@@ -21,6 +22,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
   } = Shared;
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
   const AirportDbModal = createFirstRunModal(Shared);
+  const MapCacheCard = createMapCacheCard(Shared);
 
   const SettingsPanel: FC = () => {
     const [settings, setSettings] = useState<PluginSettings | null>(null);
@@ -144,19 +146,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Basemap</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">
-              Using <a className="underline" href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> vector tiles online (OpenStreetMap data, ODbL).
-            </div>
-            <div className="text-xs text-muted-foreground mt-2">
-              Offline map regions are planned for a future release. Airport search and navlog work offline once the airport database is downloaded.
-            </div>
-          </CardContent>
-        </Card>
+        <MapCacheCard />
 
         <Card>
           <CardHeader>
