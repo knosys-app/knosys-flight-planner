@@ -1,0 +1,11 @@
+{
+  "buildDate": "2026-04-18T05:31:17.495Z",
+  "rowCounts": {
+    "airports": 85159,
+    "runways": 47771,
+    "navaids": 11010,
+    "frequencies": 30248
+  },
+  "source": "ourairports.com (davidmegginson.github.io mirror)",
+  "sizeBytes": 18604032
+}

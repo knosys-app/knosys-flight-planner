@@ -73,10 +73,14 @@ export const PMTILES_REGIONS = [
   },
 ] as const;
 
-// Airport database CDN location. The `publish:data` script uploads built
-// airports.sqlite to a GitHub Release matching the plugin version.
+// Airport database URL. Served from raw.githubusercontent.com because
+// github.com/releases/download/* doesn't send CORS headers and Electron's
+// renderer (where the plugin runs) enforces CORS. raw.githubusercontent.com
+// returns `access-control-allow-origin: *`. The file is ~18 MB and lives
+// at data/airports.sqlite on the repo's main branch \u2014 refresh the data by
+// rebuilding locally (`npm run build:db`) and committing a new sqlite.
 export const AIRPORTS_DB_URL =
-  'https://github.com/knosys-app/knosys-flight-planner/releases/download/data-v1/airports.sqlite';
+  'https://raw.githubusercontent.com/knosys-app/knosys-flight-planner/main/data/airports.sqlite';
 
 export const DEFAULT_SETTINGS = {
   schemaVersion: 1 as const,
