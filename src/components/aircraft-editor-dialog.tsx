@@ -55,11 +55,11 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{aircraft ? 'Edit aircraft' : 'New aircraft'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 overflow-auto -mx-1 px-1">
             <div className="col-span-2">
               <Label>Name / tail number</Label>
               <Input value={form.name} onChange={(e: any) => update('name', e.target.value)} />

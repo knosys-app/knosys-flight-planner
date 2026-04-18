@@ -24,7 +24,7 @@ export function createAircraftPicker(Shared: SharedDependencies) {
                 <SelectItem key={a.id} value={a.id}>
                   <span className="font-medium">{a.name}</span>
                   <span className="text-muted-foreground text-sm ml-2">
-                    {a.type} \u00B7 {a.tasKt} kt \u00B7 {a.fuelBurnGph} gph
+                    {a.type} · {a.tasKt} kt · {a.fuelBurnGph} gph
                   </span>
                 </SelectItem>
               ))}

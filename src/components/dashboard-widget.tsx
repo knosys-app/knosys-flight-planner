@@ -31,7 +31,7 @@ export function createDashboardWidgets(Shared: SharedDependencies) {
               >
                 <div className="font-medium">{p.name}</div>
                 <div className="text-muted-foreground">
-                  {p.departureIcao} \u2192 {p.destinationIcao}
+                  {p.departureIcao} → {p.destinationIcao}
                 </div>
               </button>
             ))}
@@ -63,7 +63,7 @@ export function createDashboardWidgets(Shared: SharedDependencies) {
           <div className="text-xs">
             <div className="font-medium">{nextPlan.name}</div>
             <div className="text-muted-foreground">
-              {nextPlan.departureIcao} \u2192 {nextPlan.destinationIcao}
+              {nextPlan.departureIcao} → {nextPlan.destinationIcao}
             </div>
             {nextPlan.departureTimeUtc && (
               <div className="text-muted-foreground">

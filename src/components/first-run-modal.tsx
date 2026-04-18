@@ -61,7 +61,7 @@ export function createFirstRunModal(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Install airport database</DialogTitle>
             <DialogDescription>
@@ -85,7 +85,7 @@ export function createFirstRunModal(Shared: SharedDependencies) {
           )}
 
           {status.kind === 'installed' && (
-            <div className="text-sm text-green-600">\u2713 Airport database ready.</div>
+            <div className="text-sm text-green-600">✓ Airport database ready.</div>
           )}
 
           {status.kind === 'error' && (
@@ -96,7 +96,7 @@ export function createFirstRunModal(Shared: SharedDependencies) {
             {status.kind === 'installed' ? (
               <Button onClick={onClose}>Continue</Button>
             ) : status.kind === 'downloading' ? (
-              <Button disabled>Downloading\u2026</Button>
+              <Button disabled>Downloading…</Button>
             ) : (
               <Button onClick={() => void startDownload()}>Download database</Button>
             )}

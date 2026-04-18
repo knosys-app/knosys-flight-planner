@@ -38,7 +38,7 @@ export function createPlansList(Shared: SharedDependencies) {
               <div className="flex-1 min-w-0 text-left">
                 <div className="truncate font-medium">{p.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {p.departureIcao || '?'} \u2192 {p.destinationIcao || '?'} \u00B7 {updated}
+                  {p.departureIcao || '?'} → {p.destinationIcao || '?'} · {updated}
                 </div>
               </div>
             </Button>

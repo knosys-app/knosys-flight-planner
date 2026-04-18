@@ -83,7 +83,7 @@ export function createMapViewer(Shared: SharedDependencies) {
           <div>
             <div className="font-medium mb-1">No map region installed</div>
             <div className="text-muted-foreground">
-              Open Settings \u2192 Flight Planner \u2192 Regions and download a region to enable the map.
+              Open Settings → Flight Planner → Regions and download a region to enable the map.
             </div>
           </div>
         </div>

@@ -91,7 +91,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     }, [plan, selectedAircraft, winds]);
 
     if (loading) {
-      return <div className="p-8 text-muted-foreground">Loading flight planner\u2026</div>;
+      return <div className="p-8 text-muted-foreground">Loading flight planner…</div>;
     }
 
     if (!plan || !selectedAircraft) {
@@ -153,12 +153,12 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
                 <Navlog rows={navlog.rows} />
                 {navlog.rows.length > 0 && (
                   <div className="mt-2 text-xs text-muted-foreground">
-                    Total: {navlog.totals.distanceNm.toFixed(0)} nm \u00B7{' '}
-                    {navlog.totals.eteMinutes.toFixed(0)} min \u00B7{' '}
+                    Total: {navlog.totals.distanceNm.toFixed(0)} nm ·{' '}
+                    {navlog.totals.eteMinutes.toFixed(0)} min ·{' '}
                     {navlog.totals.fuelBurnedGal.toFixed(1)} gal
                     {!navlog.totals.reserveOk && (
                       <span className="ml-2 text-red-600 font-medium">
-                        \u26A0 Below reserve fuel
+                        ⚠ Below reserve fuel
                       </span>
                     )}
                   </div>

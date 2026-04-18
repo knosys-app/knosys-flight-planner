@@ -158,7 +158,7 @@ export function createRouteBuilder(Shared: SharedDependencies) {
                 <div className="text-xs text-muted-foreground truncate">{wp.name}</div>
               </div>
               <Button size="icon" variant="ghost" onClick={() => moveUp(index)} title="Up">
-                <span>\u25B2</span>
+                <span>▲</span>
               </Button>
               <Button size="icon" variant="ghost" onClick={() => moveDown(index)} title="Down">
                 {ArrowDown && <ArrowDown className="w-4 h-4" />}

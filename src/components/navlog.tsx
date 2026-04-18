@@ -2,13 +2,13 @@ import type { FC } from 'react';
 import type { NavlogRow, SharedDependencies } from '../types';
 
 function round(n: number, digits: number): string {
-  if (!Number.isFinite(n)) return '\u2014';
+  if (!Number.isFinite(n)) return '—';
   const f = Math.pow(10, digits);
   return (Math.round(n * f) / f).toFixed(digits);
 }
 
 function deg(n: number): string {
-  if (!Number.isFinite(n)) return '\u2014';
+  if (!Number.isFinite(n)) return '—';
   const v = ((Math.round(n) % 360) + 360) % 360;
   return v.toString().padStart(3, '0');
 }
@@ -50,7 +50,7 @@ export function createNavlog(Shared: SharedDependencies) {
                 <td className="px-2 py-1">{r.legIndex + 1}</td>
                 <td className="px-2 py-1 whitespace-nowrap">
                   <span className="font-medium">{r.fromRef}</span>
-                  <span className="text-muted-foreground mx-1">\u2192</span>
+                  <span className="text-muted-foreground mx-1">→</span>
                   <span className="font-medium">{r.toRef}</span>
                 </td>
                 <td className="px-2 py-1 text-right">{round(r.distanceNm, 1)}</td>

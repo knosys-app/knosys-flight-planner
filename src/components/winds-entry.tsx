@@ -58,7 +58,7 @@ export function createWindsEntry(Shared: SharedDependencies) {
             />
           </div>
           <div>
-            <Label className="text-xs">Dir (\u00B0T)</Label>
+            <Label className="text-xs">Dir (°T)</Label>
             <Input
               type="number"
               value={draft.dirTrueDeg ?? ''}
@@ -78,7 +78,7 @@ export function createWindsEntry(Shared: SharedDependencies) {
             />
           </div>
           <div>
-            <Label className="text-xs">Temp (\u00B0C)</Label>
+            <Label className="text-xs">Temp (°C)</Label>
             <Input
               type="number"
               value={draft.tempC ?? ''}
@@ -96,9 +96,9 @@ export function createWindsEntry(Shared: SharedDependencies) {
             <thead className="bg-muted">
               <tr>
                 <th className="px-2 py-1 text-left">Alt (ft)</th>
-                <th className="px-2 py-1 text-left">Dir \u00B0T</th>
+                <th className="px-2 py-1 text-left">Dir °T</th>
                 <th className="px-2 py-1 text-left">Kt</th>
-                <th className="px-2 py-1 text-left">\u00B0C</th>
+                <th className="px-2 py-1 text-left">°C</th>
                 <th />
               </tr>
             </thead>
@@ -106,7 +106,7 @@ export function createWindsEntry(Shared: SharedDependencies) {
               {winds.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-2 text-center text-muted-foreground">
-                    No winds entered \u2014 add one row per altitude
+                    No winds entered — add one row per altitude
                   </td>
                 </tr>
               )}

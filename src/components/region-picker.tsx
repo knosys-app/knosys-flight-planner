@@ -78,7 +78,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Map regions</DialogTitle>
             <DialogDescription>
@@ -87,7 +87,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 max-h-[50vh] overflow-auto">
+          <div className="space-y-2 flex-1 min-h-0 overflow-auto -mx-1 px-1">
             {PMTILES_REGIONS.map((region) => {
               const isInstalled = installed.includes(region.id);
               const prog = progress[region.id];
@@ -103,7 +103,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium">{region.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        ~{region.sizeMb} MB \u00B7 {region.note}
+                        ~{region.sizeMb} MB · {region.note}
                       </div>
                     </div>
                     {isInstalled && <Badge variant="secondary">Installed</Badge>}
@@ -119,7 +119,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
                   )}
                   {prog === 'error' && (
                     <div className="mt-2 text-xs text-red-600">
-                      Download failed \u2014 check your connection and try again.
+                      Download failed — check your connection and try again.
                     </div>
                   )}
                   <div className="mt-2 flex gap-2 justify-end">
@@ -137,7 +137,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
                         onClick={() => void download(region.id)}
                         disabled={!!downloading}
                       >
-                        {downloading ? 'Downloading\u2026' : 'Download'}
+                        {downloading ? 'Downloading…' : 'Download'}
                       </Button>
                     )}
                   </div>

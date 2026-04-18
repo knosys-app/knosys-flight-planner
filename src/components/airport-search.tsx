@@ -63,7 +63,7 @@ export function createAirportSearch(Shared: SharedDependencies) {
         </PopoverTrigger>
         <PopoverContent className="w-80 p-0" onOpenAutoFocus={(e: any) => e.preventDefault()}>
           <div className="max-h-72 overflow-auto">
-            {pending && <div className="p-3 text-sm text-muted-foreground">Searching\u2026</div>}
+            {pending && <div className="p-3 text-sm text-muted-foreground">Searching…</div>}
             {!pending && query && results.length === 0 && (
               <div className="p-3 text-sm text-muted-foreground">No airports match "{query}"</div>
             )}
@@ -74,11 +74,11 @@ export function createAirportSearch(Shared: SharedDependencies) {
                 onClick={() => handleSelect(a)}
               >
                 <div className="font-medium">
-                  {a.icao} {a.iata ? `\u00B7 ${a.iata}` : ''}
+                  {a.icao} {a.iata ? `· ${a.iata}` : ''}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {a.name}
-                  {a.municipality ? ` \u2014 ${a.municipality}` : ''}
+                  {a.municipality ? ` — ${a.municipality}` : ''}
                   {a.country ? `, ${a.country}` : ''}
                 </div>
               </button>

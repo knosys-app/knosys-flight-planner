@@ -38,7 +38,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
       void refresh();
     }, []);
 
-    if (!settings) return <div className="p-4">Loading\u2026</div>;
+    if (!settings) return <div className="p-4">Loading…</div>;
 
     const update = async (patch: Partial<PluginSettings>) => {
       const next = await saveSettings(patch);
@@ -56,7 +56,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
               <div>
                 <Label>Metric units</Label>
                 <div className="text-xs text-muted-foreground">
-                  When enabled: km/h, km, meters, liters, \u00B0C. Off = knots, nm, feet, gallons, \u00B0F.
+                  When enabled: km/h, km, meters, liters, °C. Off = knots, nm, feet, gallons, °F.
                 </div>
               </div>
               <Switch
@@ -119,7 +119,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{a.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {a.type} \u00B7 {a.tasKt} kt \u00B7 {a.fuelBurnGph} gph \u00B7 {a.fuelCapacityGal} gal
+                      {a.type} · {a.tasKt} kt · {a.fuelBurnGph} gph · {a.fuelCapacityGal} gal
                     </div>
                   </div>
                   <Button
