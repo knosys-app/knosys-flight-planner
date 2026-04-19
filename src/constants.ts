@@ -27,8 +27,6 @@ export const OPFS_REGIONS_DIR = 'regions';
 // from protomaps.github.io (CORS-enabled). Only the PMTile URL needs the
 // main-process proxy.
 export const PROTOMAPS_URL_PATTERN = 'https://build.protomaps.com/{date}.pmtiles';
-export const PROTOMAPS_STYLE_URL =
-  'https://protomaps.github.io/basemaps-assets/styles/v4/light.json';
 export const MAP_ATTRIBUTION =
   '<a href="https://protomaps.com">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 export const MAP_CACHE_DIR = 'map-cache';

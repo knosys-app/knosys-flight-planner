@@ -27,13 +27,12 @@ export function createMapViewer(Shared: SharedDependencies) {
           const planetUrl = await resolvePlanetUrl();
           if (cancelled) return;
           await installCachedPmtilesProtocol(planetUrl);
-          if (cancelled) return;
-          const style = await buildPlanetStyle(planetUrl);
           if (cancelled || !containerRef.current) return;
+          const style = buildPlanetStyle(planetUrl);
 
           map = new maplibregl.Map({
             container: containerRef.current,
-            style: style as any,
+            style,
             center: [-98, 39.5],
             zoom: 3,
             attributionControl: false,
