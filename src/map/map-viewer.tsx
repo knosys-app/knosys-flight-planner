@@ -3,10 +3,15 @@ import maplibregl, { type Map as MaplibreMap } from 'maplibre-gl';
 import type { Plan, SharedDependencies } from '../types';
 import { ensureMaplibreWorker } from './maplibre-worker-setup';
 import { RouteMapLayer } from './route-map-layer';
-import { MAP_ATTRIBUTION } from '../constants';
+import {
+  DEFAULT_MAP_CENTER,
+  DEFAULT_MAP_ZOOM,
+  MAP_ATTRIBUTION,
+} from '../constants';
 import { resolvePlanetUrl } from './planet-url';
 import { installCachedPmtilesProtocol } from './cached-pmtiles-protocol';
 import { buildPlanetStyle } from './style-config';
+import { loadMapViewport, saveMapViewport } from '../store/viewport-store';
 
 export function createMapViewer(Shared: SharedDependencies) {
   const { useEffect, useRef, useState } = Shared;
@@ -24,7 +29,10 @@ export function createMapViewer(Shared: SharedDependencies) {
 
       (async () => {
         try {
-          const planetUrl = await resolvePlanetUrl();
+          const [planetUrl, savedViewport] = await Promise.all([
+            resolvePlanetUrl(),
+            loadMapViewport(),
+          ]);
           if (cancelled) return;
           await installCachedPmtilesProtocol(planetUrl);
           if (cancelled || !containerRef.current) return;
@@ -33,8 +41,10 @@ export function createMapViewer(Shared: SharedDependencies) {
           map = new maplibregl.Map({
             container: containerRef.current,
             style,
-            center: [-98, 39.5],
-            zoom: 3,
+            center: savedViewport?.center ?? DEFAULT_MAP_CENTER,
+            zoom: savedViewport?.zoom ?? DEFAULT_MAP_ZOOM,
+            bearing: savedViewport?.bearing ?? 0,
+            pitch: savedViewport?.pitch ?? 0,
             attributionControl: false,
           });
           map.addControl(
@@ -56,6 +66,16 @@ export function createMapViewer(Shared: SharedDependencies) {
             if (cancelled || !map) return;
             routeLayerRef.current.setPlan(plan);
             routeLayerRef.current.render(map);
+          });
+          map.on('moveend', () => {
+            if (!map) return;
+            const c = map.getCenter();
+            void saveMapViewport({
+              center: [c.lng, c.lat],
+              zoom: map.getZoom(),
+              bearing: map.getBearing(),
+              pitch: map.getPitch(),
+            });
           });
           map.on('error', (e) => {
             // eslint-disable-next-line no-console

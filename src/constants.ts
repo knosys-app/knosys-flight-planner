@@ -14,9 +14,13 @@ export const STORAGE_KEYS = {
   mapRegionsIndex: 'map-regions-index',
   mapRegion: (id: string) => `map-region:${id}`,
   mapSource: 'map-source',
+  mapViewport: 'map-viewport',
   schemaVersion: 'schema-version',
   firstRunComplete: 'first-run-complete',
 } as const;
+
+export const DEFAULT_MAP_CENTER: [number, number] = [-98, 39.5];
+export const DEFAULT_MAP_ZOOM = 3;
 
 export const OPFS_ROOT_DIR = 'flight-planner';
 export const OPFS_AIRPORTS_DB = 'airports.sqlite';
