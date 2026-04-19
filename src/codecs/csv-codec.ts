@@ -26,6 +26,8 @@ export const CsvFormat: PlanFormatCodec = {
       'TH (\u00B0)': round(r.trueHeadingDeg, 0),
       'Var (\u00B0)': round(r.magVarDeg, 1),
       'MH (\u00B0)': round(r.magneticHeadingDeg, 0),
+      'Freq (MHz)': r.primaryFreq ? round(r.primaryFreq.mhz, 3) : '',
+      'Freq Type': r.primaryFreq?.type ?? '',
       'TAS (kt)': round(r.tasKt, 0),
       'GS (kt)': round(r.groundSpeedKt, 0),
       'ETE (min)': round(r.eteMinutes, 1),

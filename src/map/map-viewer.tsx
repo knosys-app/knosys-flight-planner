@@ -3,6 +3,8 @@ import maplibregl, { type Map as MaplibreMap } from 'maplibre-gl';
 import type { Plan, SharedDependencies } from '../types';
 import { ensureMaplibreWorker } from './maplibre-worker-setup';
 import { RouteMapLayer } from './route-map-layer';
+import { AirportMarkersLayer } from './airport-markers-layer';
+import { RunwayOverlayLayer } from './runway-overlay-layer';
 import {
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
@@ -12,15 +14,29 @@ import { resolvePlanetUrl } from './planet-url';
 import { installCachedPmtilesProtocol } from './cached-pmtiles-protocol';
 import { buildPlanetStyle } from './style-config';
 import { loadMapViewport, saveMapViewport } from '../store/viewport-store';
+import { getAeroDataSource } from '../hooks/use-aero-data';
+import type { SelectedAirportStore } from '../hooks/use-selected-airport';
 
 export function createMapViewer(Shared: SharedDependencies) {
   const { useEffect, useRef, useState } = Shared;
 
-  const MapViewer: FC<{ plan: Plan | null }> = ({ plan }) => {
+  const MapViewer: FC<{
+    plan: Plan | null;
+    selectedAirport: SelectedAirportStore;
+  }> = ({ plan, selectedAirport }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MaplibreMap | null>(null);
     const routeLayerRef = useRef<RouteMapLayer>(new RouteMapLayer());
+    const runwayLayerRef = useRef<RunwayOverlayLayer>(new RunwayOverlayLayer());
+    const markersLayerRef = useRef<AirportMarkersLayer | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Hold a stable reference to the selected-airport store so marker click
+    // handlers always see the latest setter.
+    const selectedStoreRef = useRef(selectedAirport);
+    useEffect(() => {
+      selectedStoreRef.current = selectedAirport;
+    }, [selectedAirport]);
 
     useEffect(() => {
       let cancelled = false;
@@ -62,8 +78,23 @@ export function createMapViewer(Shared: SharedDependencies) {
             new maplibregl.ScaleControl({ unit: 'nautical' }),
             'bottom-left',
           );
+
+          const markersLayer = new AirportMarkersLayer(async (icao: string) => {
+            try {
+              const ds = getAeroDataSource();
+              const full = await ds.findAirportByIcao(icao);
+              if (full) selectedStoreRef.current.setAirport(full);
+            } catch {
+              /* ignore */
+            }
+          });
+          markersLayerRef.current = markersLayer;
+
           map.on('load', () => {
             if (cancelled || !map) return;
+            // Draw order: runways (bottom) -> airport markers -> route line on top.
+            runwayLayerRef.current.render(map);
+            markersLayer.render(map);
             routeLayerRef.current.setPlan(plan);
             routeLayerRef.current.render(map);
           });
@@ -117,6 +148,32 @@ export function createMapViewer(Shared: SharedDependencies) {
         map.once('load', render);
       }
     }, [plan]);
+
+    // Reflect selected airport on the runway overlay layer.
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      const airport =
+        selectedAirport.selected?.kind === 'airport'
+          ? selectedAirport.selected.airport
+          : null;
+      runwayLayerRef.current.setAirport(airport);
+      const apply = () => runwayLayerRef.current.update(map);
+      if (map.isStyleLoaded()) apply();
+      else map.once('load', apply);
+    }, [selectedAirport.selected]);
+
+    // Fly-to requests from the detail sheet etc.
+    useEffect(() => {
+      const map = mapRef.current;
+      const req = selectedAirport.flyToRequest;
+      if (!map || !req) return;
+      map.flyTo({
+        center: [req.lng, req.lat],
+        zoom: req.zoom ?? Math.max(map.getZoom(), 9),
+        duration: 700,
+      });
+    }, [selectedAirport.flyToRequest]);
 
     if (error) {
       return (

@@ -1,11 +1,23 @@
-import type { Airport, Navaid } from '../types';
+import type { Airport, AirportType, Navaid } from '../types';
 
 export type BoundingBox = [west: number, south: number, east: number, north: number];
+
+export interface AirportQueryOptions {
+  types?: AirportType[];
+  limit?: number;
+}
 
 export interface AeroDataSource {
   ready(): Promise<void>;
   findAirportByIcao(icao: string): Promise<Airport | null>;
-  searchAirports(query: string, limit?: number): Promise<Airport[]>;
+  searchAirports(query: string, limit?: number, opts?: AirportQueryOptions): Promise<Airport[]>;
   findNavaid(id: string): Promise<Navaid | null>;
-  airportsInBbox(bbox: BoundingBox, limit?: number): Promise<Airport[]>;
+  searchNavaids(query: string, limit?: number): Promise<Navaid[]>;
+  airportsInBbox(bbox: BoundingBox, opts?: AirportQueryOptions): Promise<Airport[]>;
+  /**
+   * Same as airportsInBbox, but skips the runway + frequency joins. Used by
+   * the map markers layer where we only need lat/lon/ident/type to render,
+   * then fetch the full airport when the user clicks a marker.
+   */
+  airportsInBboxLite(bbox: BoundingBox, opts?: AirportQueryOptions): Promise<Airport[]>;
 }

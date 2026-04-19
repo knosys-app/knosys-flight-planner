@@ -272,6 +272,11 @@ export interface WindsEntryRow {
   tempC?: number;
 }
 
+export interface NavlogPrimaryFreq {
+  type: string;
+  mhz: number;
+}
+
 export interface NavlogRow {
   legIndex: number;
   fromRef: string;
@@ -292,6 +297,8 @@ export interface NavlogRow {
   fuelBurnedGal: number;
   fuelRemainingGal: number;
   reserveOk: boolean;
+  /** Populated asynchronously after computeNavlog by hydrateNavlogFrequencies. */
+  primaryFreq?: NavlogPrimaryFreq;
 }
 
 export interface PluginSettings {

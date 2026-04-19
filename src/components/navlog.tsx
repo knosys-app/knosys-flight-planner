@@ -37,6 +37,7 @@ export function createNavlog(Shared: SharedDependencies) {
               <th className="px-2 py-1 text-right">TH</th>
               <th className="px-2 py-1 text-right">Var</th>
               <th className="px-2 py-1 text-right">MH</th>
+              <th className="px-2 py-1 text-right">Freq</th>
               <th className="px-2 py-1 text-right">GS</th>
               <th className="px-2 py-1 text-right">ETE</th>
               <th className="px-2 py-1 text-right">Fuel</th>
@@ -59,6 +60,15 @@ export function createNavlog(Shared: SharedDependencies) {
                 <td className="px-2 py-1 text-right">{deg(r.trueHeadingDeg)}</td>
                 <td className="px-2 py-1 text-right">{round(r.magVarDeg, 1)}</td>
                 <td className="px-2 py-1 text-right font-medium">{deg(r.magneticHeadingDeg)}</td>
+                <td className="px-2 py-1 text-right whitespace-nowrap">
+                  {r.primaryFreq ? (
+                    <span title={r.primaryFreq.type}>
+                      {r.primaryFreq.mhz.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-2 py-1 text-right">{round(r.groundSpeedKt, 0)}</td>
                 <td className="px-2 py-1 text-right">{round(r.eteMinutes, 0)}</td>
                 <td className="px-2 py-1 text-right">{round(r.fuelBurnedGal, 1)}</td>

@@ -17,6 +17,8 @@ import type {
   Waypoint,
   WindsEntryRow,
 } from '../types';
+import { waypointFrequency } from '../data/frequency-picker';
+import type { AeroDataSource } from '../data/aero-data-source';
 
 export interface NavlogInputs {
   plan: Plan;
@@ -142,4 +144,51 @@ function legWindInput(
     return { dirTrueDeg: leg.windDir, speedKt: leg.windKt };
   }
   return interpolateWinds(winds, leg.altFt);
+}
+
+/**
+ * Hydrate each navlog row's `primaryFreq` by looking up the destination
+ * waypoint in the airport/navaid database. Pure helper (no React) so it
+ * can be driven from any caller. Preserves row order + base fields.
+ */
+export async function hydrateNavlogFrequencies(
+  rows: NavlogRow[],
+  plan: Plan,
+  dataSource: AeroDataSource,
+): Promise<NavlogRow[]> {
+  if (rows.length === 0) return rows;
+  const wpIndex = new Map<string, Waypoint>(plan.waypoints.map((w) => [w.id, w]));
+  const byRef = new Map<string, Waypoint>();
+  for (const w of plan.waypoints) byRef.set(w.ref, w);
+
+  // Cache lookups per ref so we don't hit the same airport twice.
+  const airportCache = new Map<string, Awaited<ReturnType<AeroDataSource['findAirportByIcao']>>>();
+  const navaidCache = new Map<string, Awaited<ReturnType<AeroDataSource['findNavaid']>>>();
+
+  const hydrated = await Promise.all(
+    rows.map(async (r) => {
+      const leg = plan.legs[r.legIndex];
+      const toWp = leg ? wpIndex.get(leg.toId) : byRef.get(r.toRef);
+      if (!toWp) return r;
+
+      let freq: { type: string; mhz: number } | null = null;
+      if (toWp.kind === 'airport') {
+        if (!airportCache.has(toWp.ref)) {
+          airportCache.set(toWp.ref, await dataSource.findAirportByIcao(toWp.ref));
+        }
+        const airport = airportCache.get(toWp.ref) ?? null;
+        freq = waypointFrequency(toWp, airport?.frequencies);
+      } else if (toWp.kind === 'navaid') {
+        if (!navaidCache.has(toWp.ref)) {
+          navaidCache.set(toWp.ref, await dataSource.findNavaid(toWp.ref));
+        }
+        const navaid = navaidCache.get(toWp.ref) ?? null;
+        freq = waypointFrequency(toWp, undefined, navaid);
+      }
+
+      return freq ? { ...r, primaryFreq: freq } : r;
+    }),
+  );
+
+  return hydrated;
 }

@@ -1,7 +1,31 @@
 import type { Database } from 'sql.js';
 import { loadSqlJs } from './sqljs-loader';
-import type { AeroDataSource, BoundingBox } from './aero-data-source';
+import type {
+  AeroDataSource,
+  AirportQueryOptions,
+  BoundingBox,
+} from './aero-data-source';
 import type { Airport, AirportType, Frequency, Navaid, Runway } from '../types';
+
+const DEFAULT_TYPES: AirportType[] = [
+  'large_airport',
+  'medium_airport',
+  'small_airport',
+  'seaplane_base',
+];
+
+function buildTypeClause(
+  types: AirportType[] | undefined,
+  binds: Record<string, unknown>,
+): string {
+  if (!types || types.length === 0) return '';
+  const placeholders = types.map((_, i) => {
+    const key = `:type${i}`;
+    binds[key] = types[i];
+    return key;
+  });
+  return ` AND type IN (${placeholders.join(',')})`;
+}
 
 const AIRPORT_COLUMNS = [
   'ident',
@@ -82,18 +106,31 @@ export class SqlJsAeroDataSource implements AeroDataSource {
     }
   }
 
-  async searchAirports(query: string, limit = 20): Promise<Airport[]> {
+  async searchAirports(
+    query: string,
+    limit = 20,
+    opts: AirportQueryOptions = {},
+  ): Promise<Airport[]> {
     await this.ready();
     const db = this.requireDb();
     const q = query.trim();
     if (!q) return [];
     const likeTerm = `${q.toUpperCase()}%`;
+    const types = opts.types ?? DEFAULT_TYPES;
+
+    const binds: Record<string, unknown> = {
+      ':like': likeTerm,
+      ':exact': q.toUpperCase(),
+      ':limit': limit,
+    };
+    const typeClause = buildTypeClause(types, binds);
 
     const stmt = db.prepare(
       `SELECT ${AIRPORT_COLUMNS} FROM airports
-       WHERE ident LIKE :like
+       WHERE (ident LIKE :like
           OR iata_code LIKE :like
-          OR local_code LIKE :like
+          OR local_code LIKE :like)
+          ${typeClause}
        ORDER BY
          CASE WHEN ident = :exact THEN 0
               WHEN iata_code = :exact THEN 1
@@ -107,28 +144,82 @@ export class SqlJsAeroDataSource implements AeroDataSource {
        LIMIT :limit`,
     );
     try {
-      stmt.bind({ ':like': likeTerm, ':exact': q.toUpperCase(), ':limit': limit });
+      stmt.bind(binds as any);
       const rows: Airport[] = [];
       while (stmt.step()) {
         rows.push(this.hydrateAirport(stmt.getAsObject() as unknown as AirportRow));
       }
       if (rows.length >= limit) return rows;
-      return rows.concat(await this.searchByName(q, limit - rows.length));
+      return rows.concat(await this.searchByName(q, limit - rows.length, types));
     } finally {
       stmt.free();
     }
   }
 
-  private async searchByName(query: string, limit: number): Promise<Airport[]> {
+  private async searchByName(
+    query: string,
+    limit: number,
+    types: AirportType[] | undefined,
+  ): Promise<Airport[]> {
     const db = this.requireDb();
+    const binds: Record<string, unknown> = { ':like': `%${query}%`, ':limit': limit };
+    const typeClause = buildTypeClause(types, binds);
     const stmt = db.prepare(
-      `SELECT ${AIRPORT_COLUMNS} FROM airports WHERE name LIKE :like LIMIT :limit`,
+      `SELECT ${AIRPORT_COLUMNS} FROM airports
+       WHERE name LIKE :like ${typeClause}
+       LIMIT :limit`,
     );
     try {
-      stmt.bind({ ':like': `%${query}%`, ':limit': limit });
+      stmt.bind(binds as any);
       const rows: Airport[] = [];
       while (stmt.step()) {
         rows.push(this.hydrateAirport(stmt.getAsObject() as unknown as AirportRow));
+      }
+      return rows;
+    } finally {
+      stmt.free();
+    }
+  }
+
+  async searchNavaids(query: string, limit = 10): Promise<Navaid[]> {
+    await this.ready();
+    const db = this.requireDb();
+    const q = query.trim();
+    if (!q) return [];
+    const stmt = db.prepare(
+      `SELECT ident, name, type, latitude_deg, longitude_deg, elevation_ft, frequency_khz
+       FROM navaids
+       WHERE ident LIKE :like OR name LIKE :name
+       ORDER BY CASE WHEN ident = :exact THEN 0 ELSE 1 END
+       LIMIT :limit`,
+    );
+    try {
+      stmt.bind({
+        ':like': `${q.toUpperCase()}%`,
+        ':name': `%${q}%`,
+        ':exact': q.toUpperCase(),
+        ':limit': limit,
+      });
+      const rows: Navaid[] = [];
+      while (stmt.step()) {
+        const r = stmt.getAsObject() as {
+          ident: string;
+          name: string;
+          type: string;
+          latitude_deg: number;
+          longitude_deg: number;
+          elevation_ft: number | null;
+          frequency_khz: number | null;
+        };
+        rows.push({
+          id: r.ident,
+          name: r.name,
+          type: (r.type?.toUpperCase() as any) ?? 'VOR',
+          lat: r.latitude_deg,
+          lon: r.longitude_deg,
+          elevationFt: r.elevation_ft ?? undefined,
+          freq: r.frequency_khz ? r.frequency_khz / 1000 : undefined,
+        });
       }
       return rows;
     } finally {
@@ -169,33 +260,71 @@ export class SqlJsAeroDataSource implements AeroDataSource {
     }
   }
 
-  async airportsInBbox(bbox: BoundingBox, limit = 500): Promise<Airport[]> {
+  async airportsInBbox(bbox: BoundingBox, opts: AirportQueryOptions = {}): Promise<Airport[]> {
+    const rows = await this.bboxRows(bbox, opts);
+    return rows.map((r) => this.hydrateAirport(r));
+  }
+
+  async airportsInBboxLite(
+    bbox: BoundingBox,
+    opts: AirportQueryOptions = {},
+  ): Promise<Airport[]> {
+    const rows = await this.bboxRows(bbox, opts);
+    return rows.map((r) => this.airportFromRowLite(r));
+  }
+
+  private async bboxRows(
+    bbox: BoundingBox,
+    opts: AirportQueryOptions,
+  ): Promise<AirportRow[]> {
     await this.ready();
     const db = this.requireDb();
     const [west, south, east, north] = bbox;
+    const limit = opts.limit ?? 500;
+    const types = opts.types ?? DEFAULT_TYPES;
+    const binds: Record<string, unknown> = {
+      ':west': west,
+      ':east': east,
+      ':south': south,
+      ':north': north,
+      ':limit': limit,
+    };
+    const typeClause = buildTypeClause(types, binds);
     const stmt = db.prepare(
       `SELECT ${AIRPORT_COLUMNS} FROM airports
        WHERE longitude_deg BETWEEN :west AND :east
          AND latitude_deg BETWEEN :south AND :north
-         AND type IN ('large_airport','medium_airport','small_airport')
+         ${typeClause}
        LIMIT :limit`,
     );
     try {
-      stmt.bind({
-        ':west': west,
-        ':east': east,
-        ':south': south,
-        ':north': north,
-        ':limit': limit,
-      });
-      const rows: Airport[] = [];
+      stmt.bind(binds as any);
+      const out: AirportRow[] = [];
       while (stmt.step()) {
-        rows.push(this.hydrateAirport(stmt.getAsObject() as unknown as AirportRow));
+        out.push(stmt.getAsObject() as unknown as AirportRow);
       }
-      return rows;
+      return out;
     } finally {
       stmt.free();
     }
+  }
+
+  private airportFromRowLite(row: AirportRow): Airport {
+    return {
+      icao: row.ident,
+      iata: row.iata_code ?? undefined,
+      localCode: row.local_code ?? undefined,
+      name: row.name,
+      lat: row.latitude_deg,
+      lon: row.longitude_deg,
+      elevationFt: row.elevation_ft ?? 0,
+      country: row.iso_country,
+      region: row.iso_region ?? undefined,
+      municipality: row.municipality ?? undefined,
+      type: coerceAirportType(row.type),
+      runways: [],
+      frequencies: [],
+    };
   }
 
   private hydrateAirport(row: AirportRow): Airport {

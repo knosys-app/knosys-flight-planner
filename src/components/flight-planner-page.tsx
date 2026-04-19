@@ -1,14 +1,22 @@
 import type { FC } from 'react';
 import { v4 as uuid } from 'uuid';
-import type { AircraftProfile, Plan, SharedDependencies } from '../types';
+import type {
+  AircraftProfile,
+  NavlogRow,
+  Plan,
+  SharedDependencies,
+  Waypoint,
+} from '../types';
 import { createEmptyPlan, deletePlan, duplicatePlan, savePlan } from '../store/plan-store';
 import { saveAircraft } from '../store/aircraft-store';
-import { computeNavlog } from '../hooks/use-navlog';
+import { computeNavlog, hydrateNavlogFrequencies } from '../hooks/use-navlog';
 import {
   createFlightPlannerProvider,
   type FlightPlannerStore,
 } from '../hooks/use-flight-planner-store';
 import { isAirportsDbInstalled } from '../data/first-run-download';
+import { getAeroDataSource } from '../hooks/use-aero-data';
+import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
 
 import { createPlanHeader } from './plan-header';
 import { createAircraftPicker } from './aircraft-picker';
@@ -19,25 +27,31 @@ import { createNavlog } from './navlog';
 import { createExportBar } from './export-bar';
 import { createPlansList } from './plans-list';
 import { createFirstRunModal } from './first-run-modal';
+import { createAirportDetailSheet } from './airport-detail-sheet';
 import { createMapViewer } from '../map/map-viewer';
 
 export function createFlightPlannerPage(Shared: SharedDependencies) {
-  const { useState, useEffect, useMemo, Card, CardHeader, CardContent, Separator } = Shared;
+  const { useState, useEffect, useMemo, Separator } = Shared;
   const { Provider, useFlightPlannerStore } = createFlightPlannerProvider(Shared);
+  const {
+    Provider: SelectedAirportProvider,
+    useSelectedAirport,
+  } = createSelectedAirportProvider(Shared);
 
   const PlanHeader = createPlanHeader(Shared);
   const AircraftPicker = createAircraftPicker(Shared);
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
-  const RouteBuilder = createRouteBuilder(Shared);
   const WindsEntry = createWindsEntry(Shared);
   const Navlog = createNavlog(Shared);
   const ExportBar = createExportBar(Shared);
   const PlansList = createPlansList(Shared);
   const FirstRunModal = createFirstRunModal(Shared);
+  const AirportDetailSheet = createAirportDetailSheet(Shared);
   const MapViewer = createMapViewer(Shared);
 
   const Inner: FC = () => {
     const store = useFlightPlannerStore();
+    const selectedAirport = useSelectedAirport();
     const {
       plan,
       plans,
@@ -58,6 +72,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingAircraft, setEditingAircraft] = useState<AircraftProfile | null>(null);
     const [firstRunOpen, setFirstRunOpen] = useState(false);
+    const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
 
     useEffect(() => {
       (async () => {
@@ -72,12 +87,62 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       }
     }, [loading, plan, selectedAircraft, newPlan]);
 
+    const RouteBuilder = useMemo(
+      () =>
+        createRouteBuilder(Shared, {
+          onWaypointClick: async (wp: Waypoint) => {
+            try {
+              const ds = getAeroDataSource();
+              if (wp.kind === 'airport') {
+                const a = await ds.findAirportByIcao(wp.ref);
+                if (a) selectedAirport.setAirport(a);
+              } else if (wp.kind === 'navaid') {
+                const n = await ds.findNavaid(wp.ref);
+                if (n) selectedAirport.setNavaid(n);
+              }
+            } catch {
+              /* non-fatal */
+            }
+          },
+        }),
+      [selectedAirport],
+    );
+
     const navlog = useMemo(() => {
       if (!plan || !selectedAircraft) {
-        return { rows: [], totals: { distanceNm: 0, eteMinutes: 0, fuelBurnedGal: 0, fuelRemainingGal: 0, reserveOk: true } };
+        return {
+          rows: [] as NavlogRow[],
+          totals: {
+            distanceNm: 0,
+            eteMinutes: 0,
+            fuelBurnedGal: 0,
+            fuelRemainingGal: 0,
+            reserveOk: true,
+          },
+        };
       }
       return computeNavlog({ plan, aircraft: selectedAircraft, winds });
     }, [plan, selectedAircraft, winds]);
+
+    useEffect(() => {
+      let cancelled = false;
+      if (!plan || navlog.rows.length === 0) {
+        setHydratedRows(navlog.rows);
+        return;
+      }
+      (async () => {
+        try {
+          const ds = getAeroDataSource();
+          const hydrated = await hydrateNavlogFrequencies(navlog.rows, plan, ds);
+          if (!cancelled) setHydratedRows(hydrated);
+        } catch {
+          if (!cancelled) setHydratedRows(navlog.rows);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [plan, navlog.rows]);
 
     if (loading) {
       return <div className="p-8 text-muted-foreground">Loading flight planner…</div>;
@@ -90,6 +155,41 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         </div>
       );
     }
+
+    const appendWaypoint = (wp: {
+      kind: 'airport' | 'navaid';
+      ref: string;
+      name: string;
+      lat: number;
+      lon: number;
+    }) => {
+      const newWp: Waypoint = {
+        id: uuid(),
+        kind: wp.kind,
+        ref: wp.ref,
+        name: wp.name,
+        lat: wp.lat,
+        lon: wp.lon,
+        altFt: settings.defaultCruiseAltFt,
+      };
+      const nextWaypoints = [...plan.waypoints, newWp];
+      const nextLegs = [];
+      for (let i = 0; i < nextWaypoints.length - 1; i++) {
+        nextLegs.push({
+          fromId: nextWaypoints[i].id,
+          toId: nextWaypoints[i + 1].id,
+          altFt: nextWaypoints[i + 1].altFt ?? settings.defaultCruiseAltFt,
+        });
+      }
+      setPlan({
+        ...plan,
+        waypoints: nextWaypoints,
+        legs: nextLegs,
+        departureIcao: nextWaypoints[0]?.ref ?? plan.departureIcao,
+        destinationIcao:
+          nextWaypoints[nextWaypoints.length - 1]?.ref ?? plan.destinationIcao,
+      });
+    };
 
     return (
       <div className="flex h-full flex-col">
@@ -139,7 +239,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
               <div>
                 <div className="font-medium text-sm mb-1">Navlog</div>
-                <Navlog rows={navlog.rows} />
+                <Navlog rows={hydratedRows.length > 0 ? hydratedRows : navlog.rows} />
                 {navlog.rows.length > 0 && (
                   <div className="mt-2 text-xs text-muted-foreground">
                     Total: {navlog.totals.distanceNm.toFixed(0)} nm ·{' '}
@@ -156,7 +256,11 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
               <Separator />
 
-              <ExportBar plan={plan} aircraft={selectedAircraft} navlog={navlog.rows} />
+              <ExportBar
+                plan={plan}
+                aircraft={selectedAircraft}
+                navlog={hydratedRows.length > 0 ? hydratedRows : navlog.rows}
+              />
 
               <Separator />
 
@@ -168,7 +272,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           </div>
 
           <div className="flex-1 min-h-0 relative">
-            <MapViewer plan={plan} />
+            <MapViewer plan={plan} selectedAirport={selectedAirport} />
           </div>
         </div>
 
@@ -187,13 +291,17 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           open={firstRunOpen}
           onClose={() => setFirstRunOpen(false)}
         />
+
+        <AirportDetailSheet store={selectedAirport} onAddToRoute={appendWaypoint} />
       </div>
     );
   };
 
   const FlightPlannerPage: FC = () => (
     <Provider>
-      <Inner />
+      <SelectedAirportProvider>
+        <Inner />
+      </SelectedAirportProvider>
     </Provider>
   );
 

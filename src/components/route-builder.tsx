@@ -1,11 +1,16 @@
 import type { FC } from 'react';
 import { v4 as uuid } from 'uuid';
-import type { Airport, Plan, SharedDependencies, Waypoint } from '../types';
+import type { Airport, Navaid, Plan, SharedDependencies, Waypoint } from '../types';
 import { tokenizeRouteString } from '../utils/parse-route-string';
 import { getAeroDataSource } from '../hooks/use-aero-data';
-import { createAirportSearch } from './airport-search';
+import { createAirportSearch, type AirportSearchSelection } from './airport-search';
 
-export function createRouteBuilder(Shared: SharedDependencies) {
+export function createRouteBuilder(
+  Shared: SharedDependencies,
+  hooks?: {
+    onWaypointClick?: (waypoint: Waypoint) => void;
+  },
+) {
   const { useState, Input, Button, Label, Badge, lucideIcons } = Shared;
   const AirportSearch = createAirportSearch(Shared);
   const { ArrowDown, X, Plus } = lucideIcons as Record<string, any>;
@@ -18,6 +23,18 @@ export function createRouteBuilder(Shared: SharedDependencies) {
       name: a.name,
       lat: a.lat,
       lon: a.lon,
+      altFt,
+    };
+  }
+
+  function waypointFromNavaid(n: Navaid, altFt?: number): Waypoint {
+    return {
+      id: uuid(),
+      kind: 'navaid',
+      ref: n.id,
+      name: n.name,
+      lat: n.lat,
+      lon: n.lon,
       altFt,
     };
   }
@@ -55,8 +72,12 @@ export function createRouteBuilder(Shared: SharedDependencies) {
       });
     };
 
-    const addAirport = (a: Airport) => {
-      update([...plan.waypoints, waypointFromAirport(a, defaultCruiseAltFt)]);
+    const addSelection = (sel: AirportSearchSelection) => {
+      if (sel.kind === 'airport' && sel.airport) {
+        update([...plan.waypoints, waypointFromAirport(sel.airport, defaultCruiseAltFt)]);
+      } else if (sel.kind === 'navaid' && sel.navaid) {
+        update([...plan.waypoints, waypointFromNavaid(sel.navaid, defaultCruiseAltFt)]);
+      }
     };
 
     const removeWaypoint = (id: string) => {
@@ -137,8 +158,8 @@ export function createRouteBuilder(Shared: SharedDependencies) {
         </div>
 
         <div>
-          <Label>Add airport</Label>
-          <AirportSearch onSelect={addAirport} />
+          <Label>Add airport or navaid</Label>
+          <AirportSearch onSelect={addSelection} />
         </div>
 
         <div className="space-y-1">
@@ -150,9 +171,17 @@ export function createRouteBuilder(Shared: SharedDependencies) {
           {plan.waypoints.map((wp, index) => (
             <div
               key={wp.id}
-              className="flex items-center gap-2 p-2 border rounded bg-card"
+              className="flex items-center gap-2 p-2 border rounded bg-card hover:bg-accent/40 cursor-pointer"
+              onClick={(e: any) => {
+                // Ignore clicks on the row's action buttons
+                if ((e.target as HTMLElement).closest('button')) return;
+                hooks?.onWaypointClick?.(wp);
+              }}
             >
               <Badge variant="secondary">{index + 1}</Badge>
+              {wp.kind === 'navaid' && (
+                <Badge variant="outline" className="text-[10px]">NAV</Badge>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="font-medium">{wp.ref}</div>
                 <div className="text-xs text-muted-foreground truncate">{wp.name}</div>
