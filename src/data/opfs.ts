@@ -22,15 +22,16 @@ export async function resolveFile(
   pathSegments: string[],
   createIfMissing = false,
 ): Promise<FileSystemFileHandle | null> {
-  let dir = await rootDir();
-  for (let i = 0; i < pathSegments.length - 1; i++) {
-    dir = await dir.getDirectoryHandle(pathSegments[i], { create: createIfMissing });
-  }
-  const filename = pathSegments[pathSegments.length - 1];
   try {
+    let dir = await rootDir();
+    for (let i = 0; i < pathSegments.length - 1; i++) {
+      dir = await dir.getDirectoryHandle(pathSegments[i], { create: createIfMissing });
+    }
+    const filename = pathSegments[pathSegments.length - 1];
     return await dir.getFileHandle(filename, { create: createIfMissing });
   } catch (err) {
     if (createIfMissing) throw err;
+    // Missing file OR missing intermediate directory is a cache miss.
     return null;
   }
 }
