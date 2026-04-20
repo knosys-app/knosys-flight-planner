@@ -341,16 +341,19 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         <div className="flex flex-1 min-h-0">
           <div className="w-[420px] border-r overflow-auto flex flex-col">
             <div className="p-3 space-y-4">
-              <BlockTimeCard
-                totals={navlog.blockTotals}
-                rows={rowsForDisplay}
-                loading={routeProfile.loading}
-                error={routeProfile.error}
-                onShowProfile={() => setProfileOpen(true)}
-                anyAutoPicked={anyAutoPicked}
-              />
-
-              <Separator />
+              {plan.legs.length > 0 && (
+                <>
+                  <BlockTimeCard
+                    totals={navlog.blockTotals}
+                    rows={rowsForDisplay}
+                    loading={routeProfile.loading}
+                    error={routeProfile.error}
+                    onShowProfile={() => setProfileOpen(true)}
+                    anyAutoPicked={anyAutoPicked}
+                  />
+                  <Separator />
+                </>
+              )}
 
               <AircraftPicker
                 aircraft={aircraft}

@@ -63,20 +63,16 @@ export class FaaDofObstacleProvider implements ObstacleProvider {
     const db = this.db;
     if (!db) return [];
     const [west, south, east, north] = bbox;
-    const hasRtree = tableExists(db, 'obstacles_rtree');
-    const sql = hasRtree
-      ? `SELECT o.* FROM obstacles o
-         JOIN obstacles_idmap m ON m.id = o.id
-         JOIN obstacles_rtree r ON r.id_num = m.id_num
-         WHERE r.min_lat <= ? AND r.max_lat >= ?
-           AND r.min_lon <= ? AND r.max_lon >= ?`
-      : `SELECT * FROM obstacles
-         WHERE lat BETWEEN ? AND ?
-           AND lon BETWEEN ? AND ?`;
-    const params = hasRtree ? [north, south, east, west] : [south, north, west, east];
-    const stmt = db.prepare(sql);
+    // The bundled sql.js WASM doesn't ship with the R-tree extension, so we
+    // always use a plain index on (lat, lon). 14k obstacles scan in a few
+    // milliseconds — R-tree isn't worth the custom WASM build.
+    const stmt = db.prepare(
+      `SELECT * FROM obstacles
+       WHERE lat BETWEEN ? AND ?
+         AND lon BETWEEN ? AND ?`,
+    );
     try {
-      stmt.bind(params);
+      stmt.bind([south, north, west, east]);
       const out: Obstacle[] = [];
       while (stmt.step()) {
         const row = stmt.getAsObject() as Record<string, unknown>;
@@ -142,12 +138,3 @@ function rowToObstacle(row: Record<string, unknown>): Obstacle {
   };
 }
 
-function tableExists(db: Database, name: string): boolean {
-  const stmt = db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','view') AND name = ?");
-  try {
-    stmt.bind([name]);
-    return stmt.step();
-  } finally {
-    stmt.free();
-  }
-}

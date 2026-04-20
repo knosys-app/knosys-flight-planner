@@ -76,27 +76,51 @@ export class TerrariumTerrainProvider implements TerrainProvider {
     startAlongTrackNm = 0,
   ): Promise<ProfileSample[]> {
     const points = sampleRoute(from, to, stepNm, startAlongTrackNm);
-    // Parallel fetch of unique tiles touched by the route, then assign.
     const uniqueTiles = new Set<string>();
     for (const p of points) {
       const tx = Math.floor(lonToTileX(p.lon, this.z));
       const ty = Math.floor(latToTileY(p.lat, this.z));
       uniqueTiles.add(`${tx}/${ty}`);
     }
-    await Promise.all(
-      Array.from(uniqueTiles).map((key) => {
+    console.log(
+      `[flight-planner] terrain: sampling ${points.length} points across ${uniqueTiles.size} tiles (z=${this.z})`,
+    );
+    const tileResults = await Promise.all(
+      Array.from(uniqueTiles).map(async (key) => {
         const [tx, ty] = key.split('/').map(Number);
-        return this.loadTile(tx, ty).catch(() => null);
+        try {
+          await this.loadTile(tx, ty);
+          return { key, ok: true as const };
+        } catch (err) {
+          console.warn(
+            `[flight-planner] terrain: tile ${this.z}/${tx}/${ty} failed:`,
+            err instanceof Error ? err.message : err,
+          );
+          return { key, ok: false as const, err };
+        }
       }),
     );
+    const failures = tileResults.filter((r) => !r.ok).length;
+    if (failures > 0) {
+      console.warn(
+        `[flight-planner] terrain: ${failures}/${tileResults.length} tiles failed to load`,
+      );
+    }
+
     const out: ProfileSample[] = [];
+    let zeroCount = 0;
     for (const p of points) {
       let elev = 0;
       try {
         elev = await this.elevationAt(p.lat, p.lon);
-      } catch {
+      } catch (err) {
+        console.warn(
+          `[flight-planner] terrain: elevationAt(${p.lat.toFixed(3)},${p.lon.toFixed(3)}) failed:`,
+          err instanceof Error ? err.message : err,
+        );
         elev = 0;
       }
+      if (elev === 0) zeroCount++;
       out.push({
         alongTrackNm: p.alongTrackNm,
         lat: p.lat,
@@ -104,6 +128,10 @@ export class TerrariumTerrainProvider implements TerrainProvider {
         terrainElevFt: Number.isFinite(elev) ? elev : 0,
       });
     }
+    const maxElev = Math.max(...out.map((s) => s.terrainElevFt));
+    console.log(
+      `[flight-planner] terrain: done. maxElev=${Math.round(maxElev)} ft, zeroSamples=${zeroCount}/${out.length}`,
+    );
     return out;
   }
 
@@ -115,7 +143,6 @@ export class TerrariumTerrainProvider implements TerrainProvider {
     if (pending) return pending;
 
     const task = (async () => {
-      // Check OPFS cache first.
       let bytes = await readTerrainTile(this.z, tx, ty);
       if (!bytes) {
         const url = TERRARIUM_URL_PATTERN.replace('{z}', String(this.z))
@@ -123,17 +150,27 @@ export class TerrariumTerrainProvider implements TerrainProvider {
           .replace('{y}', String(ty));
         const res = await pluginFetch(url, { method: 'GET', timeoutMs: 15000 });
         if (res.status !== 200) {
-          throw new Error(`Terrain fetch ${res.status} for ${this.z}/${tx}/${ty}`);
+          throw new Error(
+            `Terrain fetch ${res.status} ${res.statusText} for ${url} (body=${res.body.byteLength}B)`,
+          );
         }
         bytes = res.body;
-        // Fire-and-forget OPFS write; failure here is non-fatal.
-        writeTerrainTile(this.z, tx, ty, bytes).catch(() => {
-          /* ignore */
-        });
+        console.log(
+          `[flight-planner] terrain: fetched ${this.z}/${tx}/${ty} (${bytes.byteLength}B) ${url}`,
+        );
+        writeTerrainTile(this.z, tx, ty, bytes).catch((err) =>
+          console.warn('[flight-planner] terrain: OPFS write failed', err),
+        );
       }
-      const decoded = await decodeTileBytes(bytes);
-      this.memoryCache.set(key, decoded);
-      return decoded;
+      try {
+        const decoded = await decodeTileBytes(bytes);
+        this.memoryCache.set(key, decoded);
+        return decoded;
+      } catch (err) {
+        throw new Error(
+          `Decode failed for ${this.z}/${tx}/${ty}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
     })();
 
     this.inFlight.set(key, task);

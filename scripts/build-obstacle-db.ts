@@ -87,6 +87,8 @@ async function main(): Promise<void> {
   db.pragma('journal_mode = OFF');
   db.pragma('synchronous = OFF');
 
+  // No R-tree virtual table — the sql.js WASM doesn't ship the R-tree
+  // module, and 14k CONUS obstacles scan fine with a plain (lat, lon) index.
   db.exec(`
     CREATE TABLE obstacles (
       id TEXT PRIMARY KEY,
@@ -99,26 +101,12 @@ async function main(): Promise<void> {
       marked INTEGER,
       name TEXT
     );
-    CREATE TABLE obstacles_idmap (
-      id_num INTEGER PRIMARY KEY AUTOINCREMENT,
-      id TEXT UNIQUE
-    );
-    CREATE VIRTUAL TABLE obstacles_rtree USING rtree(
-      id_num, min_lat, max_lat, min_lon, max_lon
-    );
     CREATE INDEX idx_obstacles_lat_lon ON obstacles(lat, lon);
   `);
 
   const insertObs = db.prepare(`
-    INSERT INTO obstacles (id, lat, lon, height_agl, height_msl, type, lighted, marked, name)
+    INSERT OR IGNORE INTO obstacles (id, lat, lon, height_agl, height_msl, type, lighted, marked, name)
     VALUES (@id, @lat, @lon, @height_agl, @height_msl, @type, @lighted, @marked, @name)
-  `);
-  const insertIdmap = db.prepare(`
-    INSERT INTO obstacles_idmap (id) VALUES (?)
-  `);
-  const insertRtree = db.prepare(`
-    INSERT INTO obstacles_rtree (id_num, min_lat, max_lat, min_lon, max_lon)
-    VALUES (?, ?, ?, ?, ?)
   `);
 
   let inserted = 0;
@@ -168,7 +156,7 @@ async function main(): Promise<void> {
       const lit = lighting !== '' && lighting !== 'N' && lighting !== 'U';
       // Marking: M=marked, P=painted, F=flag. Anything other than N/U/empty is marked.
       const mk = marking !== '' && marking !== 'N' && marking !== 'U';
-      insertObs.run({
+      const info = insertObs.run({
         id,
         lat,
         lon,
@@ -179,9 +167,7 @@ async function main(): Promise<void> {
         marked: mk ? 1 : 0,
         name: null,
       });
-      const info = insertIdmap.run(id);
-      insertRtree.run(info.lastInsertRowid, lat, lat, lon, lon);
-      inserted++;
+      if (info.changes > 0) inserted++;
     }
   });
   txn(rows);
