@@ -1,18 +1,14 @@
 import {
-  eteMinutes,
-  fuelBurnGal,
-  greatCircleDistanceNm,
-  greatCircleInitialBearingDeg,
-  interpolateWinds,
   magneticHeading,
   magneticVariation,
   reserveOk as reserveOkFn,
-  windTriangle,
 } from '../math/aviation-math';
+import { computePhaseLeg } from '../math/phase-navlog';
 import type {
   AircraftProfile,
-  Leg,
+  BlockTotals,
   NavlogRow,
+  NavlogWarning,
   Plan,
   Waypoint,
   WindsEntryRow,
@@ -25,14 +21,15 @@ export interface NavlogInputs {
   aircraft: AircraftProfile;
   winds: WindsEntryRow[];
   departureTimeUtc?: Date;
+  /** Per-leg external warnings (e.g., terrain pierces altitude). */
+  legWarnings?: NavlogWarning[][];
+  /** Departure airport elevation in ft (used for first-leg climb-out). */
+  departureElevFt?: number;
+  /** Arrival airport elevation in ft (used for last-leg descent-in). */
+  arrivalElevFt?: number;
 }
 
-/**
- * Derives the navlog from a plan + aircraft + winds table. Pure function \u2014 no
- * side effects, safe to memoize. Handles wind interpolation per leg using
- * the leg's cruise altitude. Assumes TAS is aircraft cruise TAS.
- */
-export function computeNavlog(input: NavlogInputs): {
+export interface NavlogOutput {
   rows: NavlogRow[];
   totals: {
     distanceNm: number;
@@ -41,42 +38,70 @@ export function computeNavlog(input: NavlogInputs): {
     fuelRemainingGal: number;
     reserveOk: boolean;
   };
-} {
-  const { plan, aircraft, winds, departureTimeUtc } = input;
+  blockTotals: BlockTotals;
+}
+
+/**
+ * Derives the navlog from a plan + aircraft + winds table using the phase
+ * model (climb / cruise / descent per leg) plus taxi + pattern allowances.
+ * Pure function — safe to memoize; side-effect-free.
+ */
+export function computeNavlog(input: NavlogInputs): NavlogOutput {
+  const { plan, aircraft, winds, departureTimeUtc, legWarnings } = input;
   const wayIndex = new Map<string, Waypoint>(plan.waypoints.map((w) => [w.id, w]));
   const rows: NavlogRow[] = [];
   const date = departureTimeUtc ?? new Date();
+
+  const firstLegFromElev = input.departureElevFt ?? 0;
+  const lastLegToElev = input.arrivalElevFt ?? 0;
 
   let currentFuelGal = aircraft.fuelCapacityGal;
   let totalDist = 0;
   let totalEte = 0;
   let totalFuel = 0;
+  let climbMin = 0;
+  let cruiseMin = 0;
+  let descentMin = 0;
+  let climbFuel = 0;
+  let cruiseFuel = 0;
+  let descentFuel = 0;
   let etaCursor: Date | undefined = departureTimeUtc ? new Date(departureTimeUtc) : undefined;
 
-  plan.legs.forEach((leg: Leg, i: number) => {
+  // Taxi phase (one per trip, subtracted from initial fuel before first leg).
+  const taxiMinutes = aircraft.taxiMinutes ?? 10;
+  const taxiGph = aircraft.taxiGph ?? aircraft.fuelBurnGph * 0.3;
+  const taxiFuelGal = (taxiMinutes / 60) * taxiGph;
+  currentFuelGal = Math.max(0, currentFuelGal - taxiFuelGal);
+
+  plan.legs.forEach((leg, i) => {
     const from = wayIndex.get(leg.fromId);
     const to = wayIndex.get(leg.toId);
     if (!from || !to) return;
 
-    const distanceNm = greatCircleDistanceNm(from, to);
-    const trueCourseDeg = greatCircleInitialBearingDeg(from, to);
+    const prevLeg = i > 0 ? plan.legs[i - 1] : null;
+    const nextLeg = i < plan.legs.length - 1 ? plan.legs[i + 1] : null;
+    const prevCruiseAlt = prevLeg ? prevLeg.altFt : null;
+    const nextCruiseAlt = nextLeg ? nextLeg.altFt : null;
 
-    const legWind = legWindInput(leg, winds);
-    const tasKt = leg.tasKt ?? aircraft.tasKt;
-    const { wcaDeg, thDeg, gsKt } = windTriangle(
-      trueCourseDeg,
-      tasKt,
-      legWind.dirTrueDeg,
-      legWind.speedKt,
-    );
+    const phase = computePhaseLeg({
+      leg,
+      fromWp: from,
+      toWp: to,
+      prevCruiseAlt,
+      nextCruiseAlt,
+      departureElevFt: i === 0 ? firstLegFromElev : 0,
+      arrivalElevFt: i === plan.legs.length - 1 ? lastLegToElev : 0,
+      aircraft,
+      winds,
+    });
 
     const midLat = (from.lat + to.lat) / 2;
     const midLon = (from.lon + to.lon) / 2;
     const magVarDeg = magneticVariation(midLat, midLon, date);
-    const magneticHeadingDeg = magneticHeading(thDeg, midLat, midLon, date);
+    const magneticHeadingDeg = magneticHeading(phase.trueHeadingDeg, midLat, midLon, date);
 
-    const ete = eteMinutes(distanceNm, gsKt);
-    const fuelBurned = fuelBurnGal(ete, aircraft.fuelBurnGph);
+    const ete = phase.totalTimeMin;
+    const fuelBurned = phase.totalFuelGal;
     currentFuelGal = Math.max(0, currentFuelGal - fuelBurned);
 
     let etaIso: string | undefined;
@@ -85,12 +110,18 @@ export function computeNavlog(input: NavlogInputs): {
       etaIso = etaCursor.toISOString();
     }
 
-    const reserveOk = reserveOkFn(
-      totalFuel + fuelBurned,
+    const legRsvOk = reserveOkFn(
+      totalFuel + fuelBurned + taxiFuelGal,
       aircraft.fuelCapacityGal,
       plan.reserveMinutesOverride ?? aircraft.reserveMinutes,
       aircraft.fuelBurnGph,
     );
+
+    const externalWarnings = legWarnings?.[i] ?? [];
+    const warnings = [...phase.warnings, ...externalWarnings];
+    if (!legRsvOk) {
+      warnings.push({ kind: 'belowReserve', message: 'Below required reserve fuel' });
+    }
 
     rows.push({
       legIndex: i,
@@ -99,25 +130,47 @@ export function computeNavlog(input: NavlogInputs): {
       toRef: to.ref,
       toName: to.name,
       altFt: leg.altFt,
-      distanceNm,
-      trueCourseDeg,
-      windCorrectionAngleDeg: wcaDeg,
-      trueHeadingDeg: thDeg,
+      altAutoPicked: leg.altAutoPicked,
+      distanceNm: phase.distanceNm,
+      trueCourseDeg: phase.trueCourseDeg,
+      windCorrectionAngleDeg: phase.windCorrectionAngleDeg,
+      trueHeadingDeg: phase.trueHeadingDeg,
       magVarDeg,
       magneticHeadingDeg,
-      tasKt,
-      groundSpeedKt: gsKt,
+      tasKt: phase.cruiseTasKt,
+      groundSpeedKt: phase.groundSpeedKt,
       eteMinutes: ete,
       etaIso,
       fuelBurnedGal: fuelBurned,
       fuelRemainingGal: currentFuelGal,
-      reserveOk,
+      reserveOk: legRsvOk,
+      phases: {
+        climb: phase.climb,
+        cruise: phase.cruise,
+        descent: phase.descent,
+      },
+      warnings,
     });
 
-    totalDist += distanceNm;
+    totalDist += phase.distanceNm;
     totalEte += ete;
     totalFuel += fuelBurned;
+    climbMin += phase.climb?.timeMin ?? 0;
+    cruiseMin += phase.cruise.timeMin;
+    descentMin += phase.descent?.timeMin ?? 0;
+    climbFuel += phase.climb?.fuelGal ?? 0;
+    cruiseFuel += phase.cruise.fuelGal;
+    descentFuel += phase.descent?.fuelGal ?? 0;
   });
+
+  // Pattern phase (one per trip, at destination before landing).
+  const patternMinutes = aircraft.patternMinutes ?? 5;
+  const patternFuelGal = (patternMinutes / 60) * aircraft.fuelBurnGph;
+  currentFuelGal = Math.max(0, currentFuelGal - patternFuelGal);
+
+  const blockMin = taxiMinutes + climbMin + cruiseMin + descentMin + patternMinutes;
+  const blockFuelGal =
+    taxiFuelGal + climbFuel + cruiseFuel + descentFuel + patternFuelGal;
 
   return {
     rows,
@@ -127,23 +180,28 @@ export function computeNavlog(input: NavlogInputs): {
       fuelBurnedGal: totalFuel,
       fuelRemainingGal: currentFuelGal,
       reserveOk: reserveOkFn(
-        totalFuel,
+        totalFuel + taxiFuelGal + patternFuelGal,
         aircraft.fuelCapacityGal,
         plan.reserveMinutesOverride ?? aircraft.reserveMinutes,
         aircraft.fuelBurnGph,
       ),
     },
+    blockTotals: {
+      taxiMin: taxiMinutes,
+      climbMin,
+      cruiseMin,
+      descentMin,
+      patternMin: patternMinutes,
+      blockMin,
+      taxiFuelGal,
+      climbFuelGal: climbFuel,
+      cruiseFuelGal: cruiseFuel,
+      descentFuelGal: descentFuel,
+      patternFuelGal,
+      blockFuelGal,
+      blockDistanceNm: totalDist,
+    },
   };
-}
-
-function legWindInput(
-  leg: Leg,
-  winds: WindsEntryRow[],
-): { dirTrueDeg: number; speedKt: number } {
-  if (leg.windDir !== undefined && leg.windKt !== undefined) {
-    return { dirTrueDeg: leg.windDir, speedKt: leg.windKt };
-  }
-  return interpolateWinds(winds, leg.altFt);
 }
 
 /**
@@ -161,7 +219,6 @@ export async function hydrateNavlogFrequencies(
   const byRef = new Map<string, Waypoint>();
   for (const w of plan.waypoints) byRef.set(w.ref, w);
 
-  // Cache lookups per ref so we don't hit the same airport twice.
   const airportCache = new Map<string, Awaited<ReturnType<AeroDataSource['findAirportByIcao']>>>();
   const navaidCache = new Map<string, Awaited<ReturnType<AeroDataSource['findNavaid']>>>();
 

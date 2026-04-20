@@ -14,6 +14,7 @@ import {
   createFlightPlannerProvider,
   type FlightPlannerStore,
 } from '../hooks/use-flight-planner-store';
+import { createUseRouteProfile } from '../hooks/use-route-profile';
 import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
@@ -29,14 +30,17 @@ import { createPlansList } from './plans-list';
 import { createFirstRunModal } from './first-run-modal';
 import { createAirportDetailSheet } from './airport-detail-sheet';
 import { createMapViewer } from '../map/map-viewer';
+import { createBlockTimeCard } from './block-time-card';
+import { createVerticalProfileModal } from './vertical-profile-modal';
 
 export function createFlightPlannerPage(Shared: SharedDependencies) {
-  const { useState, useEffect, useMemo, Separator } = Shared;
+  const { useState, useEffect, useMemo, useRef, Separator } = Shared;
   const { Provider, useFlightPlannerStore } = createFlightPlannerProvider(Shared);
   const {
     Provider: SelectedAirportProvider,
     useSelectedAirport,
   } = createSelectedAirportProvider(Shared);
+  const useRouteProfile = createUseRouteProfile(Shared);
 
   const PlanHeader = createPlanHeader(Shared);
   const AircraftPicker = createAircraftPicker(Shared);
@@ -48,6 +52,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const FirstRunModal = createFirstRunModal(Shared);
   const AirportDetailSheet = createAirportDetailSheet(Shared);
   const MapViewer = createMapViewer(Shared);
+  const BlockTimeCard = createBlockTimeCard(Shared);
+  const VerticalProfileModal = createVerticalProfileModal(Shared);
 
   const Inner: FC = () => {
     const store = useFlightPlannerStore();
@@ -73,6 +79,9 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [editingAircraft, setEditingAircraft] = useState<AircraftProfile | null>(null);
     const [firstRunOpen, setFirstRunOpen] = useState(false);
     const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
+    const lastAppliedAutoAltsRef = useRef<string>('');
 
     useEffect(() => {
       (async () => {
@@ -86,6 +95,77 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         newPlan();
       }
     }, [loading, plan, selectedAircraft, newPlan]);
+
+    // Resolve departure/arrival elevations from the aero DB so phase model
+    // can reason about climb-from and descent-to altitudes.
+    useEffect(() => {
+      if (!plan) return;
+      const first = plan.waypoints[0];
+      const last = plan.waypoints[plan.waypoints.length - 1];
+      const needs: string[] = [];
+      if (first && first.kind === 'airport' && airportElevations[first.ref] === undefined) {
+        needs.push(first.ref);
+      }
+      if (
+        last &&
+        last.kind === 'airport' &&
+        last.ref !== first?.ref &&
+        airportElevations[last.ref] === undefined
+      ) {
+        needs.push(last.ref);
+      }
+      if (needs.length === 0) return;
+      let cancelled = false;
+      (async () => {
+        const ds = getAeroDataSource();
+        const updates: Record<string, number> = {};
+        for (const icao of needs) {
+          try {
+            const a = await ds.findAirportByIcao(icao);
+            if (a && Number.isFinite(a.elevationFt)) {
+              updates[icao] = a.elevationFt;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!cancelled && Object.keys(updates).length > 0) {
+          setAirportElevations((prev) => ({ ...prev, ...updates }));
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [plan?.waypoints]);
+
+    const routeProfile = useRouteProfile({ plan, aircraft: selectedAircraft, settings });
+
+    // Auto-bump: when a leg has altAutoPicked === true AND the profile hook
+    // has produced a safer altitude, write it back to the plan. Fingerprint
+    // the applied values so we don't loop.
+    useEffect(() => {
+      if (!plan || routeProfile.perLegAltitudes.length !== plan.legs.length) return;
+      const fingerprint = plan.legs
+        .map((l, i) => `${i}:${l.altAutoPicked ? routeProfile.perLegAltitudes[i] : 'x'}`)
+        .join('|');
+      if (fingerprint === lastAppliedAutoAltsRef.current) return;
+
+      let changed = false;
+      const nextLegs = plan.legs.map((leg, i) => {
+        if (!leg.altAutoPicked) return leg;
+        const newAlt = routeProfile.perLegAltitudes[i];
+        if (newAlt === undefined || newAlt === leg.altFt) return leg;
+        changed = true;
+        return { ...leg, altFt: newAlt };
+      });
+      if (changed) {
+        lastAppliedAutoAltsRef.current = fingerprint;
+        setPlan({ ...plan, legs: nextLegs });
+      } else {
+        lastAppliedAutoAltsRef.current = fingerprint;
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [routeProfile.perLegAltitudes, plan?.legs]);
 
     const RouteBuilder = useMemo(
       () =>
@@ -108,6 +188,17 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       [selectedAirport],
     );
 
+    const depElev = (() => {
+      const first = plan?.waypoints[0];
+      if (first && first.kind === 'airport') return airportElevations[first.ref] ?? 0;
+      return 0;
+    })();
+    const arrElev = (() => {
+      const last = plan?.waypoints[(plan?.waypoints.length ?? 1) - 1];
+      if (last && last.kind === 'airport') return airportElevations[last.ref] ?? 0;
+      return 0;
+    })();
+
     const navlog = useMemo(() => {
       if (!plan || !selectedAircraft) {
         return {
@@ -119,10 +210,33 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             fuelRemainingGal: 0,
             reserveOk: true,
           },
+          blockTotals: {
+            taxiMin: 0,
+            climbMin: 0,
+            cruiseMin: 0,
+            descentMin: 0,
+            patternMin: 0,
+            blockMin: 0,
+            taxiFuelGal: 0,
+            climbFuelGal: 0,
+            cruiseFuelGal: 0,
+            descentFuelGal: 0,
+            patternFuelGal: 0,
+            blockFuelGal: 0,
+            blockDistanceNm: 0,
+          },
         };
       }
-      return computeNavlog({ plan, aircraft: selectedAircraft, winds });
-    }, [plan, selectedAircraft, winds]);
+      return computeNavlog({
+        plan,
+        aircraft: selectedAircraft,
+        winds,
+        legWarnings: routeProfile.perLegWarnings,
+        departureElevFt: depElev,
+        arrivalElevFt: arrElev,
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [plan, selectedAircraft, winds, routeProfile.perLegWarnings, depElev, arrElev]);
 
     useEffect(() => {
       let cancelled = false;
@@ -173,13 +287,24 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         altFt: settings.defaultCruiseAltFt,
       };
       const nextWaypoints = [...plan.waypoints, newWp];
+      const prevByKey = new Map(
+        plan.legs.map((l) => [`${l.fromId}:${l.toId}`, l]),
+      );
       const nextLegs = [];
       for (let i = 0; i < nextWaypoints.length - 1; i++) {
-        nextLegs.push({
-          fromId: nextWaypoints[i].id,
-          toId: nextWaypoints[i + 1].id,
-          altFt: nextWaypoints[i + 1].altFt ?? settings.defaultCruiseAltFt,
-        });
+        const fromId = nextWaypoints[i].id;
+        const toId = nextWaypoints[i + 1].id;
+        const existing = prevByKey.get(`${fromId}:${toId}`);
+        if (existing) {
+          nextLegs.push({ ...existing, fromId, toId });
+        } else {
+          nextLegs.push({
+            fromId,
+            toId,
+            altFt: nextWaypoints[i + 1].altFt ?? settings.defaultCruiseAltFt,
+            altAutoPicked: true,
+          });
+        }
       }
       setPlan({
         ...plan,
@@ -190,6 +315,9 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           nextWaypoints[nextWaypoints.length - 1]?.ref ?? plan.destinationIcao,
       });
     };
+
+    const rowsForDisplay = hydratedRows.length > 0 ? hydratedRows : navlog.rows;
+    const anyAutoPicked = plan.legs.some((l) => l.altAutoPicked);
 
     return (
       <div className="flex h-full flex-col">
@@ -213,6 +341,17 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         <div className="flex flex-1 min-h-0">
           <div className="w-[420px] border-r overflow-auto flex flex-col">
             <div className="p-3 space-y-4">
+              <BlockTimeCard
+                totals={navlog.blockTotals}
+                rows={rowsForDisplay}
+                loading={routeProfile.loading}
+                error={routeProfile.error}
+                onShowProfile={() => setProfileOpen(true)}
+                anyAutoPicked={anyAutoPicked}
+              />
+
+              <Separator />
+
               <AircraftPicker
                 aircraft={aircraft}
                 selectedId={selectedAircraft.id}
@@ -239,19 +378,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
               <div>
                 <div className="font-medium text-sm mb-1">Navlog</div>
-                <Navlog rows={hydratedRows.length > 0 ? hydratedRows : navlog.rows} />
-                {navlog.rows.length > 0 && (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Total: {navlog.totals.distanceNm.toFixed(0)} nm ·{' '}
-                    {navlog.totals.eteMinutes.toFixed(0)} min ·{' '}
-                    {navlog.totals.fuelBurnedGal.toFixed(1)} gal
-                    {!navlog.totals.reserveOk && (
-                      <span className="ml-2 text-red-600 font-medium">
-                        ⚠ Below reserve fuel
-                      </span>
-                    )}
-                  </div>
-                )}
+                <Navlog rows={rowsForDisplay} />
               </div>
 
               <Separator />
@@ -259,7 +386,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               <ExportBar
                 plan={plan}
                 aircraft={selectedAircraft}
-                navlog={hydratedRows.length > 0 ? hydratedRows : navlog.rows}
+                navlog={rowsForDisplay}
               />
 
               <Separator />
@@ -293,6 +420,18 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         />
 
         <AirportDetailSheet store={selectedAirport} onAddToRoute={appendWaypoint} />
+
+        <VerticalProfileModal
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          plan={plan}
+          aircraft={selectedAircraft}
+          rows={rowsForDisplay}
+          samples={routeProfile.samples}
+          obstacles={routeProfile.obstacles}
+          departureElevFt={depElev}
+          arrivalElevFt={arrElev}
+        />
       </div>
     );
   };

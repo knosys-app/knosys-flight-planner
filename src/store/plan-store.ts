@@ -49,7 +49,7 @@ export async function deletePlan(id: string): Promise<void> {
 export function createEmptyPlan(aircraftProfileId: string): Plan {
   const now = new Date().toISOString();
   return PlanSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: uuid(),
     name: 'Untitled Plan',
     createdAt: now,

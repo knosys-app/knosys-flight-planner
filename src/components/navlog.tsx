@@ -14,7 +14,7 @@ function deg(n: number): string {
 }
 
 export function createNavlog(Shared: SharedDependencies) {
-  const { Badge } = Shared;
+  const { Badge, React } = Shared;
 
   const Navlog: FC<{ rows: NavlogRow[] }> = ({ rows }) => {
     if (rows.length === 0) {
@@ -31,55 +31,95 @@ export function createNavlog(Shared: SharedDependencies) {
             <tr>
               <th className="px-2 py-1 text-left">#</th>
               <th className="px-2 py-1 text-left">Leg</th>
+              <th className="px-2 py-1 text-right">Alt</th>
               <th className="px-2 py-1 text-right">Dist</th>
-              <th className="px-2 py-1 text-right">TC</th>
-              <th className="px-2 py-1 text-right">WCA</th>
-              <th className="px-2 py-1 text-right">TH</th>
-              <th className="px-2 py-1 text-right">Var</th>
               <th className="px-2 py-1 text-right">MH</th>
               <th className="px-2 py-1 text-right">Freq</th>
               <th className="px-2 py-1 text-right">GS</th>
               <th className="px-2 py-1 text-right">ETE</th>
               <th className="px-2 py-1 text-right">Fuel</th>
-              <th className="px-2 py-1 text-right">Remain</th>
               <th className="px-2 py-1 text-right">Res</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.legIndex} className="border-t">
-                <td className="px-2 py-1">{r.legIndex + 1}</td>
-                <td className="px-2 py-1 whitespace-nowrap">
-                  <span className="font-medium">{r.fromRef}</span>
-                  <span className="text-muted-foreground mx-1">→</span>
-                  <span className="font-medium">{r.toRef}</span>
-                </td>
-                <td className="px-2 py-1 text-right">{round(r.distanceNm, 1)}</td>
-                <td className="px-2 py-1 text-right">{deg(r.trueCourseDeg)}</td>
-                <td className="px-2 py-1 text-right">{round(r.windCorrectionAngleDeg, 0)}</td>
-                <td className="px-2 py-1 text-right">{deg(r.trueHeadingDeg)}</td>
-                <td className="px-2 py-1 text-right">{round(r.magVarDeg, 1)}</td>
-                <td className="px-2 py-1 text-right font-medium">{deg(r.magneticHeadingDeg)}</td>
-                <td className="px-2 py-1 text-right whitespace-nowrap">
-                  {r.primaryFreq ? (
-                    <span title={r.primaryFreq.type}>
-                      {r.primaryFreq.mhz.toFixed(2)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
+            {rows.map((r) => {
+              const hasWarn = (r.warnings ?? []).length > 0;
+              return (
+                <React.Fragment key={r.legIndex}>
+                  <tr
+                    className={`border-t ${hasWarn ? 'bg-red-50' : ''}`}
+                  >
+                    <td className="px-2 py-1">{r.legIndex + 1}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      <span className="font-medium">{r.fromRef}</span>
+                      <span className="text-muted-foreground mx-1">→</span>
+                      <span className="font-medium">{r.toRef}</span>
+                    </td>
+                    <td className="px-2 py-1 text-right whitespace-nowrap">
+                      {r.altFt.toLocaleString()}
+                      {r.altAutoPicked && (
+                        <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">auto</Badge>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right">{round(r.distanceNm, 1)}</td>
+                    <td className="px-2 py-1 text-right font-medium">{deg(r.magneticHeadingDeg)}</td>
+                    <td className="px-2 py-1 text-right whitespace-nowrap">
+                      {r.primaryFreq ? (
+                        <span title={r.primaryFreq.type}>
+                          {r.primaryFreq.mhz.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right">{round(r.groundSpeedKt, 0)}</td>
+                    <td className="px-2 py-1 text-right">{round(r.eteMinutes, 0)}</td>
+                    <td className="px-2 py-1 text-right">{round(r.fuelBurnedGal, 1)}</td>
+                    <td className="px-2 py-1 text-right">
+                      <Badge variant={r.reserveOk ? 'secondary' : 'destructive'}>
+                        {r.reserveOk ? 'OK' : 'LOW'}
+                      </Badge>
+                    </td>
+                  </tr>
+                  {r.phases && (r.phases.climb || r.phases.descent) && (
+                    <tr className="border-t bg-muted/30 text-[11px] text-muted-foreground">
+                      <td />
+                      <td className="px-2 py-0.5" colSpan={9}>
+                        {r.phases.climb && (
+                          <span>
+                            Climb {round(r.phases.climb.timeMin, 0)}m · {r.phases.climb.distanceNm.toFixed(1)} nm · {r.phases.climb.fuelGal.toFixed(1)} gal
+                          </span>
+                        )}
+                        {r.phases.climb && r.phases.cruise && (
+                          <span className="mx-2">·</span>
+                        )}
+                        <span>
+                          Cruise {round(r.phases.cruise.timeMin, 0)}m · {r.phases.cruise.distanceNm.toFixed(1)} nm · {r.phases.cruise.fuelGal.toFixed(1)} gal
+                        </span>
+                        {r.phases.descent && (
+                          <>
+                            <span className="mx-2">·</span>
+                            <span>
+                              Descent {round(r.phases.descent.timeMin, 0)}m · {r.phases.descent.distanceNm.toFixed(1)} nm · {r.phases.descent.fuelGal.toFixed(1)} gal
+                            </span>
+                          </>
+                        )}
+                      </td>
+                    </tr>
                   )}
-                </td>
-                <td className="px-2 py-1 text-right">{round(r.groundSpeedKt, 0)}</td>
-                <td className="px-2 py-1 text-right">{round(r.eteMinutes, 0)}</td>
-                <td className="px-2 py-1 text-right">{round(r.fuelBurnedGal, 1)}</td>
-                <td className="px-2 py-1 text-right">{round(r.fuelRemainingGal, 1)}</td>
-                <td className="px-2 py-1 text-right">
-                  <Badge variant={r.reserveOk ? 'secondary' : 'destructive'}>
-                    {r.reserveOk ? 'OK' : 'LOW'}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
+                  {hasWarn && (
+                    <tr className="border-t bg-red-50 text-[11px] text-red-700">
+                      <td />
+                      <td className="px-2 py-0.5" colSpan={9}>
+                        {r.warnings!.map((w, i) => (
+                          <div key={i}>⚠ {w.message}</div>
+                        ))}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

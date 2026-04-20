@@ -7,7 +7,7 @@ export const PerfEntrySchema = z.object({
 });
 
 export const AircraftProfileSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   id: z.string().uuid(),
   name: z.string().min(1),
   type: z.string().min(1),
@@ -18,7 +18,14 @@ export const AircraftProfileSchema = z.object({
   reserveMinutes: z.number().int().nonnegative().default(45),
   climbFpm: z.number().positive().optional(),
   climbTasKt: z.number().positive().optional(),
+  climbGph: z.number().positive().optional(),
   descentFpm: z.number().positive().optional(),
+  descentTasKt: z.number().positive().optional(),
+  descentGph: z.number().positive().optional(),
+  taxiMinutes: z.number().nonnegative().optional(),
+  taxiGph: z.number().nonnegative().optional(),
+  patternMinutes: z.number().nonnegative().optional(),
+  serviceCeilingFt: z.number().positive().optional(),
   emptyWeightLb: z.number().positive().optional(),
   performanceTable: z.array(PerfEntrySchema).optional(),
   isPreset: z.boolean().optional(),

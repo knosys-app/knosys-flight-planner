@@ -9,6 +9,9 @@ export const PluginSettingsSchema = z.object({
   airportsDbVersion: z.string().optional(),
   airportsDbInstalledAt: z.string().datetime().optional(),
   weatherProviderId: z.string().default('manual'),
+  obstaclesEnabled: z.boolean().default(false).optional(),
+  obstaclesDbVersion: z.string().optional(),
+  obstaclesDbInstalledAt: z.string().datetime().optional(),
 });
 
 export const InstalledMapRegionSchema = z.object({

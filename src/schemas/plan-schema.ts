@@ -18,10 +18,11 @@ export const LegSchema = z.object({
   windDir: z.number().min(0).max(360).optional(),
   windKt: z.number().nonnegative().optional(),
   notes: z.string().optional(),
+  altAutoPicked: z.boolean().optional(),
 });
 
 export const PlanSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   id: z.string().uuid(),
   name: z.string().min(1),
   createdAt: z.string().datetime(),

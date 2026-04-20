@@ -115,6 +115,40 @@ export function climbProfile(input: ClimbProfileInput): { timeMin: number; dista
   return { timeMin, distanceNm };
 }
 
+export interface DescentProfileInput {
+  fromAltFt: number;
+  toAltFt: number;
+  /** Descent rate, positive feet per minute. */
+  descentFpm: number;
+  /** True airspeed during descent, knots. */
+  descentTasKt: number;
+}
+
+/**
+ * Mirror of `climbProfile` for descents. Returns time/distance required to
+ * descend from `fromAltFt` to `toAltFt` at `descentFpm` while tracking at
+ * `descentTasKt`. Returns zeros when the altitude delta is not descending.
+ */
+export function descentProfile(
+  input: DescentProfileInput,
+): { timeMin: number; distanceNm: number } {
+  const dropFt = input.fromAltFt - input.toAltFt;
+  if (dropFt <= 0 || input.descentFpm <= 0) return { timeMin: 0, distanceNm: 0 };
+  const timeMin = dropFt / input.descentFpm;
+  const distanceNm = (input.descentTasKt * timeMin) / 60;
+  return { timeMin, distanceNm };
+}
+
+/**
+ * Heuristic used by the terrain-aware altitude selector: a route segment is
+ * considered "mountainous" when any sample exceeds 8000 ft MSL. This matches
+ * the informal VFR norm of padding 2000 ft above terrain in mountainous
+ * areas rather than the standard 1000 ft.
+ */
+export function isMountainousSegment(maxTerrainFt: number): boolean {
+  return maxTerrainFt > 8000;
+}
+
 /**
  * Linear interpolation over a sorted winds-aloft table keyed by altitude.
  * Direction wraps at 360° (shortest-arc interpolation).

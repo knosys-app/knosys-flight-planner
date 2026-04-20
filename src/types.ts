@@ -220,6 +220,11 @@ export interface Leg {
   windDir?: number;
   windKt?: number;
   notes?: string;
+  /**
+   * True when `altFt` was auto-selected by the terrain-aware planner. Manual
+   * edits flip this to false so the auto-bump effect respects pilot intent.
+   */
+  altAutoPicked?: boolean;
 }
 
 export type FuelType = '100LL' | 'Jet-A' | 'MoGas';
@@ -231,7 +236,7 @@ export interface PerfEntry {
 }
 
 export interface AircraftProfile {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   name: string;
   type: string;
@@ -242,14 +247,21 @@ export interface AircraftProfile {
   reserveMinutes: number;
   climbFpm?: number;
   climbTasKt?: number;
+  climbGph?: number;
   descentFpm?: number;
+  descentTasKt?: number;
+  descentGph?: number;
+  taxiMinutes?: number;
+  taxiGph?: number;
+  patternMinutes?: number;
+  serviceCeilingFt?: number;
   emptyWeightLb?: number;
   performanceTable?: PerfEntry[];
   isPreset?: boolean;
 }
 
 export interface Plan {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   name: string;
   createdAt: string;
@@ -277,6 +289,24 @@ export interface NavlogPrimaryFreq {
   mhz: number;
 }
 
+export interface PhaseSegment {
+  timeMin: number;
+  distanceNm: number;
+  fuelGal: number;
+}
+
+export type NavlogWarningKind =
+  | 'terrainPierces'
+  | 'obstacleClose'
+  | 'serviceCeilingExceeded'
+  | 'legTooShortForClimb'
+  | 'belowReserve';
+
+export interface NavlogWarning {
+  kind: NavlogWarningKind;
+  message: string;
+}
+
 export interface NavlogRow {
   legIndex: number;
   fromRef: string;
@@ -284,6 +314,7 @@ export interface NavlogRow {
   toRef: string;
   toName: string;
   altFt: number;
+  altAutoPicked?: boolean;
   distanceNm: number;
   trueCourseDeg: number;
   windCorrectionAngleDeg: number;
@@ -297,8 +328,71 @@ export interface NavlogRow {
   fuelBurnedGal: number;
   fuelRemainingGal: number;
   reserveOk: boolean;
+  /** Per-leg phase breakdown. Climb/descent null when that phase doesn't apply. */
+  phases?: {
+    climb: PhaseSegment | null;
+    cruise: PhaseSegment;
+    descent: PhaseSegment | null;
+  };
+  warnings?: NavlogWarning[];
   /** Populated asynchronously after computeNavlog by hydrateNavlogFrequencies. */
   primaryFreq?: NavlogPrimaryFreq;
+}
+
+export interface BlockTotals {
+  taxiMin: number;
+  climbMin: number;
+  cruiseMin: number;
+  descentMin: number;
+  patternMin: number;
+  blockMin: number;
+  taxiFuelGal: number;
+  climbFuelGal: number;
+  cruiseFuelGal: number;
+  descentFuelGal: number;
+  patternFuelGal: number;
+  blockFuelGal: number;
+  blockDistanceNm: number;
+}
+
+export interface ProfileSample {
+  alongTrackNm: number;
+  lat: number;
+  lon: number;
+  terrainElevFt: number;
+}
+
+export type ObstacleType =
+  | 'tower'
+  | 'antenna'
+  | 'building'
+  | 'stack'
+  | 'crane'
+  | 'pole'
+  | 'tree'
+  | 'other';
+
+export interface Obstacle {
+  id: string;
+  lat: number;
+  lon: number;
+  heightAgl: number;
+  heightMsl: number;
+  type: ObstacleType;
+  lighted?: boolean;
+  marked?: boolean;
+  name?: string;
+}
+
+export interface RouteProfile {
+  /** Samples spanning the full route, one continuous along-track axis. */
+  samples: ProfileSample[];
+  /** Obstacles within the route corridor, with alongTrack nm resolved. */
+  obstacles: Array<Obstacle & { alongTrackNm: number }>;
+  /** Per-leg auto-picked altitude suggestion (undefined when provider failed). */
+  perLegAltitudes: Array<number | undefined>;
+  /** Per-leg warnings generated during altitude selection. */
+  perLegWarnings: NavlogWarning[][];
 }
 
 export interface PluginSettings {
@@ -310,6 +404,11 @@ export interface PluginSettings {
   airportsDbVersion?: string;
   airportsDbInstalledAt?: string;
   weatherProviderId: string;
+  /** When true, the terrain-aware altitude selector also considers obstacles. */
+  obstaclesEnabled?: boolean;
+  /** When set, plugin has downloaded the FAA DOF-derived obstacles.sqlite. */
+  obstaclesDbVersion?: string;
+  obstaclesDbInstalledAt?: string;
 }
 
 export interface InstalledMapRegion {

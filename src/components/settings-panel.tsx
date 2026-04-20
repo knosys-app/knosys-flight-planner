@@ -6,6 +6,7 @@ import { getAirportsDbSize, isAirportsDbInstalled } from '../data/first-run-down
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
 import { createFirstRunModal } from './first-run-modal';
 import { createMapCacheCard } from './map-cache-card';
+import { createObstacleSettingsCard } from './obstacle-settings-card';
 
 export function createSettingsPanel(Shared: SharedDependencies) {
   const {
@@ -23,6 +24,7 @@ export function createSettingsPanel(Shared: SharedDependencies) {
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
   const AirportDbModal = createFirstRunModal(Shared);
   const MapCacheCard = createMapCacheCard(Shared);
+  const ObstacleSettingsCard = createObstacleSettingsCard(Shared);
 
   const SettingsPanel: FC = () => {
     const [settings, setSettings] = useState<PluginSettings | null>(null);
@@ -147,6 +149,15 @@ export function createSettingsPanel(Shared: SharedDependencies) {
         </Card>
 
         <MapCacheCard />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Terrain &amp; obstacles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ObstacleSettingsCard settings={settings} onChange={update} />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

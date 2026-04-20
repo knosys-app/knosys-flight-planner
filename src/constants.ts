@@ -69,12 +69,38 @@ export type ZoomPresetKey = keyof typeof ZOOM_PRESETS;
 export const AIRPORTS_DB_URL =
   'https://raw.githubusercontent.com/knosys-app/knosys-flight-planner/main/data/airports.sqlite';
 
+// Obstacle database (FAA DOF-derived SQLite). Committed to the repo so the
+// raw.githubusercontent.com CDN can serve it with permissive CORS. Opt-in:
+// users must enable "Avoid obstacles" in settings to download this file.
+export const OBSTACLES_DB_URL =
+  'https://raw.githubusercontent.com/knosys-app/knosys-flight-planner/main/data/obstacles.sqlite';
+export const OPFS_OBSTACLES_DB = 'obstacles.sqlite';
+
+// AWS Terrarium elevation tiles. PNG-encoded RGB elevation raster, CC-BY.
+// Accessed through pluginFetch (main-process proxy) so CORS is bypassed,
+// even though S3 generally does send CORS headers.
+export const TERRARIUM_URL_PATTERN =
+  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+export const TERRAIN_CACHE_DIR = 'terrain-cache';
+export const TERRAIN_TILE_ZOOM = 10;
+export const TERRAIN_SAMPLE_STEP_NM = 0.5;
+
+// Corridor width (nm) used for obstacle lookups along a leg.
+export const OBSTACLE_CORRIDOR_NM = 4;
+
+// Block-time defaults applied via the v1→v2 migration when aircraft lacks
+// explicit values.
+export const DEFAULT_TAXI_MINUTES = 10;
+export const DEFAULT_PATTERN_MINUTES = 5;
+export const DEFAULT_SERVICE_CEILING_FT = 14000;
+
 export const DEFAULT_SETTINGS = {
   schemaVersion: 1 as const,
   units: 'us' as const,
   defaultReserveMinutes: 45,
   defaultCruiseAltFt: 5500,
   weatherProviderId: 'manual',
+  obstaclesEnabled: false,
 };
 
 // Common GA aircraft presets. These seed the aircraft list on first run so
@@ -82,7 +108,7 @@ export const DEFAULT_SETTINGS = {
 // cruise values at typical altitudes \u2014 users can edit or replace.
 export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Cessna 172S',
     type: 'C172S',
     tasKt: 120,
@@ -92,12 +118,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 700,
     climbTasKt: 75,
+    climbGph: 10,
     descentFpm: 500,
+    descentTasKt: 110,
+    descentGph: 6,
+    taxiMinutes: 10,
+    taxiGph: 2.5,
+    patternMinutes: 5,
+    serviceCeilingFt: 14000,
     emptyWeightLb: 1680,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Cessna 182T',
     type: 'C182T',
     tasKt: 140,
@@ -107,12 +140,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 900,
     climbTasKt: 80,
+    climbGph: 15,
     descentFpm: 500,
+    descentTasKt: 130,
+    descentGph: 9,
+    taxiMinutes: 10,
+    taxiGph: 4,
+    patternMinutes: 5,
+    serviceCeilingFt: 18100,
     emptyWeightLb: 1970,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Piper PA-28-181 Archer',
     type: 'PA28-181',
     tasKt: 125,
@@ -122,12 +162,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 700,
     climbTasKt: 75,
+    climbGph: 12,
     descentFpm: 500,
+    descentTasKt: 115,
+    descentGph: 7,
+    taxiMinutes: 10,
+    taxiGph: 3,
+    patternMinutes: 5,
+    serviceCeilingFt: 14000,
     emptyWeightLb: 1650,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Cirrus SR22',
     type: 'SR22',
     tasKt: 180,
@@ -137,12 +184,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 1200,
     climbTasKt: 110,
+    climbGph: 20,
     descentFpm: 500,
+    descentTasKt: 170,
+    descentGph: 12,
+    taxiMinutes: 10,
+    taxiGph: 5,
+    patternMinutes: 5,
+    serviceCeilingFt: 17500,
     emptyWeightLb: 2250,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Beechcraft Bonanza A36',
     type: 'BE36',
     tasKt: 175,
@@ -152,12 +206,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 1100,
     climbTasKt: 100,
+    climbGph: 18,
     descentFpm: 500,
+    descentTasKt: 165,
+    descentGph: 10,
+    taxiMinutes: 10,
+    taxiGph: 4.5,
+    patternMinutes: 5,
+    serviceCeilingFt: 18500,
     emptyWeightLb: 2250,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Diamond DA40',
     type: 'DA40',
     tasKt: 140,
@@ -167,12 +228,19 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 1000,
     climbTasKt: 80,
+    climbGph: 10,
     descentFpm: 500,
+    descentTasKt: 130,
+    descentGph: 6,
+    taxiMinutes: 10,
+    taxiGph: 2.5,
+    patternMinutes: 5,
+    serviceCeilingFt: 16400,
     emptyWeightLb: 1750,
     isPreset: true,
   },
   {
-    schemaVersion: 1,
+    schemaVersion: 2,
     name: 'Van\u2019s RV-7',
     type: 'RV-7',
     tasKt: 170,
@@ -182,7 +250,14 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     reserveMinutes: 45,
     climbFpm: 1500,
     climbTasKt: 90,
+    climbGph: 10,
     descentFpm: 500,
+    descentTasKt: 160,
+    descentGph: 5,
+    taxiMinutes: 10,
+    taxiGph: 2,
+    patternMinutes: 5,
+    serviceCeilingFt: 18000,
     isPreset: true,
   },
 ];
