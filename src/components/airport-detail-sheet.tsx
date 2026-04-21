@@ -122,7 +122,8 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
       <Sheet open={open} onOpenChange={(v: boolean) => !v && close()}>
         <SheetContent
           side="right"
-          className="!w-[420px] !max-w-[420px] flex flex-col p-0"
+          className="flex flex-col p-0"
+          style={{ width: 420, maxWidth: 420 }}
         >
           {store.selected?.kind === 'airport' ? (
             <AirportView airport={store.selected.airport} Shared={Shared} />

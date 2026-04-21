@@ -177,7 +177,10 @@ export function createMapViewer(Shared: SharedDependencies) {
 
     if (error) {
       return (
-        <div className="h-full w-full flex items-center justify-center bg-destructive/10 text-sm p-4">
+        <div
+          className="h-full w-full flex items-center justify-center text-sm p-4"
+          style={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
+        >
           <div>
             <div className="font-medium mb-1">Map failed to load</div>
             <div className="text-muted-foreground">{error}</div>

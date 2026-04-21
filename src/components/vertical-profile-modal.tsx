@@ -41,7 +41,7 @@ export function createVerticalProfileModal(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="!max-w-5xl w-[95vw]">
+        <DialogContent className="flex flex-col" style={{ maxWidth: '64rem', width: '95vw' }}>
           <DialogHeader>
             <DialogTitle>Vertical profile</DialogTitle>
           </DialogHeader>

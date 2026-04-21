@@ -55,7 +55,7 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
           <DialogHeader>
             <DialogTitle>{aircraft ? 'Edit aircraft' : 'New aircraft'}</DialogTitle>
           </DialogHeader>

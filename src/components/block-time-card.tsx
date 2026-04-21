@@ -59,7 +59,7 @@ export function createBlockTimeCard(Shared: SharedDependencies) {
             </span>
           </div>
           {loading && (
-            <span className="text-[10px] text-muted-foreground">calculating…</span>
+            <span className="text-muted-foreground" style={{ fontSize: 10 }}>calculating…</span>
           )}
         </div>
         <div className="mt-1 text-2xl font-semibold tracking-tight">
@@ -88,7 +88,7 @@ export function createBlockTimeCard(Shared: SharedDependencies) {
 
         {anyAutoPicked && (
           <div className="mt-2">
-            <Badge variant="secondary" className="text-[10px]">auto altitudes applied</Badge>
+            <Badge variant="secondary" style={{ fontSize: 10 }}>auto altitudes applied</Badge>
           </div>
         )}
 

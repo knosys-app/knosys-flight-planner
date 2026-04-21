@@ -339,7 +339,10 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         />
 
         <div className="flex flex-1 min-h-0">
-          <div className="w-1/3 max-w-[480px] min-w-[320px] border-r overflow-auto flex flex-col">
+          <div
+            className="border-r overflow-auto flex flex-col shrink-0"
+            style={{ width: '33%', maxWidth: 480, minWidth: 320 }}
+          >
             <div className="p-3 space-y-4">
               {plan.legs.length > 0 && (
                 <>

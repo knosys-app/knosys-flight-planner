@@ -211,7 +211,7 @@ export function createRouteBuilder(
           {plan.waypoints.map((wp, index) => (
             <div
               key={wp.id}
-              className="flex items-center gap-2 p-2 border rounded bg-card hover:bg-accent/40 cursor-pointer"
+              className="flex items-center gap-2 p-2 border rounded bg-card hover:bg-accent cursor-pointer"
               onClick={(e: any) => {
                 if ((e.target as HTMLElement).closest('button')) return;
                 hooks?.onWaypointClick?.(wp);
@@ -219,7 +219,7 @@ export function createRouteBuilder(
             >
               <Badge variant="secondary">{index + 1}</Badge>
               {wp.kind === 'navaid' && (
-                <Badge variant="outline" className="text-[10px]">NAV</Badge>
+                <Badge variant="outline" style={{ fontSize: 10 }}>NAV</Badge>
               )}
               <div className="flex-1 min-w-0">
                 <div className="font-medium">{wp.ref}</div>
@@ -267,12 +267,13 @@ export function createRouteBuilder(
                     />
                     <span className="text-muted-foreground">ft</span>
                     {leg.altAutoPicked ? (
-                      <Badge variant="secondary" className="text-[10px]">auto</Badge>
+                      <Badge variant="secondary" style={{ fontSize: 10 }}>auto</Badge>
                     ) : (
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 px-2 text-[11px]"
+                        className="h-7 px-2"
+                        style={{ fontSize: 11 }}
                         onClick={() => resetLegToAuto(i)}
                         title="Reset to terrain-safe auto altitude"
                       >

@@ -92,7 +92,7 @@ export function createFirstRunModal(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-md flex flex-col" style={{ maxHeight: '85vh' }}>
           <DialogHeader>
             <DialogTitle>Airport database</DialogTitle>
             <DialogDescription>

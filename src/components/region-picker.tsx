@@ -120,7 +120,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
 
     return (
       <Dialog open={open} onOpenChange={(v: boolean) => !v && !busy && onClose()}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-md flex flex-col" style={{ maxHeight: '85vh' }}>
           <DialogHeader>
             <DialogTitle>Download offline map region</DialogTitle>
             <DialogDescription>
@@ -169,7 +169,7 @@ export function createRegionPicker(Shared: SharedDependencies) {
               </div>
             </div>
 
-            <div className="text-sm p-3 rounded border bg-muted/40">
+            <div className="text-sm p-3 rounded border bg-muted">
               <div className="font-medium">Estimate</div>
               <div className="text-muted-foreground">
                 ~{estimate.tileCount.toLocaleString()} tiles ·{' '}

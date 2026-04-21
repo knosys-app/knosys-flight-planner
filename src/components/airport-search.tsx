@@ -116,7 +116,10 @@ export function createAirportSearch(Shared: SharedDependencies) {
             )}
             {airportResults.length > 0 && (
               <>
-                <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div
+                  className="px-3 pt-2 pb-1 font-medium uppercase tracking-wide text-muted-foreground"
+                  style={{ fontSize: 10 }}
+                >
                   Airports
                 </div>
                 {airportResults.map((a) => (
@@ -130,7 +133,7 @@ export function createAirportSearch(Shared: SharedDependencies) {
                       {a.iata && (
                         <span className="text-xs text-muted-foreground">· {a.iata}</span>
                       )}
-                      <Badge variant="secondary" className="ml-auto text-[10px]">
+                      <Badge variant="secondary" className="ml-auto" style={{ fontSize: 10 }}>
                         {a.type.replace('_airport', '').replace('_', ' ')}
                       </Badge>
                     </div>
@@ -145,7 +148,10 @@ export function createAirportSearch(Shared: SharedDependencies) {
             )}
             {navaidResults.length > 0 && (
               <>
-                <div className="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div
+                  className="px-3 pt-2 pb-1 font-medium uppercase tracking-wide text-muted-foreground"
+                  style={{ fontSize: 10 }}
+                >
                   Navaids
                 </div>
                 {navaidResults.map((n) => (
@@ -156,7 +162,7 @@ export function createAirportSearch(Shared: SharedDependencies) {
                   >
                     <div className="font-medium flex items-center gap-2">
                       <span>{n.id}</span>
-                      <Badge variant="outline" className="ml-auto text-[10px]">
+                      <Badge variant="outline" className="ml-auto" style={{ fontSize: 10 }}>
                         {n.type}
                       </Badge>
                     </div>

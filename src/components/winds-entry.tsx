@@ -46,7 +46,10 @@ export function createWindsEntry(Shared: SharedDependencies) {
     return (
       <div className="space-y-2">
         <Label>Winds aloft</Label>
-        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end text-xs">
+        <div
+          className="grid gap-2 items-end text-xs"
+          style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}
+        >
           <div>
             <Label className="text-xs">Altitude (ft)</Label>
             <Input

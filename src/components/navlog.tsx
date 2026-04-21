@@ -47,7 +47,7 @@ export function createNavlog(Shared: SharedDependencies) {
               return (
                 <React.Fragment key={r.legIndex}>
                   <tr
-                    className={`border-t ${hasWarn ? 'bg-red-50' : ''}`}
+                    className={`border-t ${hasWarn ? 'bg-red-100' : ''}`}
                   >
                     <td className="px-2 py-1">{r.legIndex + 1}</td>
                     <td className="px-2 py-1 whitespace-nowrap">
@@ -58,7 +58,7 @@ export function createNavlog(Shared: SharedDependencies) {
                     <td className="px-2 py-1 text-right whitespace-nowrap">
                       {r.altFt.toLocaleString()}
                       {r.altAutoPicked && (
-                        <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">auto</Badge>
+                        <Badge variant="secondary" className="ml-1 px-1 py-0" style={{ fontSize: 9 }}>auto</Badge>
                       )}
                     </td>
                     <td className="px-2 py-1 text-right">{round(r.distanceNm, 1)}</td>
@@ -82,7 +82,10 @@ export function createNavlog(Shared: SharedDependencies) {
                     </td>
                   </tr>
                   {r.phases && (r.phases.climb || r.phases.descent) && (
-                    <tr className="border-t bg-muted/30 text-[11px] text-muted-foreground">
+                    <tr
+                      className="border-t bg-muted text-muted-foreground"
+                      style={{ fontSize: 11 }}
+                    >
                       <td />
                       <td className="px-2 py-0.5" colSpan={9}>
                         {r.phases.climb && (
@@ -108,7 +111,10 @@ export function createNavlog(Shared: SharedDependencies) {
                     </tr>
                   )}
                   {hasWarn && (
-                    <tr className="border-t bg-red-50 text-[11px] text-red-700">
+                    <tr
+                      className="border-t bg-red-100 text-red-700"
+                      style={{ fontSize: 11 }}
+                    >
                       <td />
                       <td className="px-2 py-0.5" colSpan={9}>
                         {r.warnings!.map((w, i) => (
