@@ -82,7 +82,7 @@ export class TerrariumTerrainProvider implements TerrainProvider {
       const ty = Math.floor(latToTileY(p.lat, this.z));
       uniqueTiles.add(`${tx}/${ty}`);
     }
-    console.log(
+    console.warn(
       `[flight-planner] terrain: sampling ${points.length} points across ${uniqueTiles.size} tiles (z=${this.z})`,
     );
     const tileResults = await Promise.all(
@@ -129,7 +129,7 @@ export class TerrariumTerrainProvider implements TerrainProvider {
       });
     }
     const maxElev = Math.max(...out.map((s) => s.terrainElevFt));
-    console.log(
+    console.warn(
       `[flight-planner] terrain: done. maxElev=${Math.round(maxElev)} ft, zeroSamples=${zeroCount}/${out.length}`,
     );
     return out;
