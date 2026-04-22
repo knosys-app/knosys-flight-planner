@@ -38,6 +38,7 @@ import {
 } from './sheet/flight-sheet';
 import { createBlockPanel } from './sheet/block-panel';
 import { createProfileRibbon } from './profile/profile-ribbon';
+import { createPluginErrorBoundary } from './plugin-error-boundary';
 
 export function createFlightPlannerPage(Shared: SharedDependencies) {
   const { useState, useEffect, useMemo, useRef } = Shared;
@@ -55,6 +56,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const FlightSheet = createFlightSheet(Shared);
   const BlockPanel = createBlockPanel(Shared);
   const ProfileRibbon = createProfileRibbon(Shared);
+
+  const PluginErrorBoundary = createPluginErrorBoundary(Shared);
 
   const AircraftPicker = createAircraftPicker(Shared);
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
@@ -464,11 +467,13 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   };
 
   const FlightPlannerPage: FC = () => (
-    <Provider>
-      <SelectedAirportProvider>
-        <Inner />
-      </SelectedAirportProvider>
-    </Provider>
+    <PluginErrorBoundary>
+      <Provider>
+        <SelectedAirportProvider>
+          <Inner />
+        </SelectedAirportProvider>
+      </Provider>
+    </PluginErrorBoundary>
   );
 
   return FlightPlannerPage;
