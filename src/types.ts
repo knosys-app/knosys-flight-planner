@@ -235,8 +235,34 @@ export interface PerfEntry {
   fuelBurnGph: number;
 }
 
+/** A single weight-loading station on the aircraft (seat, baggage, etc.). */
+export interface WeightStation {
+  id: string;
+  name: string;
+  /** Longitudinal arm from datum, in inches. */
+  armIn: number;
+  /** Optional max loading for this station, in pounds. */
+  maxWeightLb?: number;
+  /** Default loading to show in the editor, in pounds. */
+  defaultWeightLb?: number;
+}
+
+/** A fuel tank location. */
+export interface FuelStation {
+  id: string;
+  name: string;
+  armIn: number;
+  capacityGal: number;
+}
+
+/** One corner of the CG envelope polygon. Ordered to form a closed shape. */
+export interface EnvelopeCorner {
+  weightLb: number;
+  cgIn: number;
+}
+
 export interface AircraftProfile {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   id: string;
   name: string;
   type: string;
@@ -256,6 +282,16 @@ export interface AircraftProfile {
   patternMinutes?: number;
   serviceCeilingFt?: number;
   emptyWeightLb?: number;
+  /** Empty-aircraft CG arm, in inches. Needed for W&B computation. */
+  emptyCgIn?: number;
+  /** Max takeoff weight, pounds. Envelope ceiling. */
+  maxGrossWeightLb?: number;
+  /** Max baggage weight, pounds. Sum of baggage-tagged stations must not exceed. */
+  maxBaggageWeightLb?: number;
+  weightStations?: WeightStation[];
+  fuelStations?: FuelStation[];
+  /** Polygon of acceptable CG + weight combinations. */
+  envelopeCorners?: EnvelopeCorner[];
   performanceTable?: PerfEntry[];
   isPreset?: boolean;
 }

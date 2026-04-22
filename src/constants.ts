@@ -108,7 +108,7 @@ export const DEFAULT_SETTINGS = {
 // cruise values at typical altitudes \u2014 users can edit or replace.
 export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Cessna 172S',
     type: 'C172S',
     tasKt: 120,
@@ -127,10 +127,27 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     patternMinutes: 5,
     serviceCeilingFt: 14000,
     emptyWeightLb: 1680,
+    emptyCgIn: 39.9,
+    maxGrossWeightLb: 2550,
+    maxBaggageWeightLb: 120,
+    weightStations: [
+      { id: 'front', name: 'Front seats', armIn: 37, maxWeightLb: 450, defaultWeightLb: 170 },
+      { id: 'rear', name: 'Rear seats', armIn: 73, maxWeightLb: 450 },
+      { id: 'bagA', name: 'Baggage A', armIn: 95, maxWeightLb: 120 },
+      { id: 'bagB', name: 'Baggage B', armIn: 123, maxWeightLb: 50 },
+    ],
+    fuelStations: [{ id: 'main', name: 'Main tanks', armIn: 48, capacityGal: 53 }],
+    envelopeCorners: [
+      { weightLb: 1500, cgIn: 35.0 },
+      { weightLb: 1950, cgIn: 35.0 },
+      { weightLb: 2550, cgIn: 41.0 },
+      { weightLb: 2550, cgIn: 47.3 },
+      { weightLb: 1500, cgIn: 47.3 },
+    ],
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Cessna 182T',
     type: 'C182T',
     tasKt: 140,
@@ -152,7 +169,7 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Piper PA-28-181 Archer',
     type: 'PA28-181',
     tasKt: 125,
@@ -174,7 +191,7 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Cirrus SR22',
     type: 'SR22',
     tasKt: 180,
@@ -196,7 +213,7 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Beechcraft Bonanza A36',
     type: 'BE36',
     tasKt: 175,
@@ -218,7 +235,7 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Diamond DA40',
     type: 'DA40',
     tasKt: 140,
@@ -240,7 +257,7 @@ export const AIRCRAFT_PRESETS: Omit<AircraftProfile, 'id'>[] = [
     isPreset: true,
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'Van\u2019s RV-7',
     type: 'RV-7',
     tasKt: 170,
