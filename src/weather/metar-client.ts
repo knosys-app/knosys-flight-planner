@@ -122,7 +122,13 @@ export async function getMetars(
   if (toFetch.length > 0) {
     try {
       const fresh = await fetchMetars(toFetch);
-      for (const id of Object.keys(fresh)) {
+      const returned = Object.keys(fresh);
+      const missing = toFetch.filter((id) => !returned.includes(id));
+      console.log(
+        `[flight-planner] METAR fetch: ${returned.length}/${toFetch.length} stations reporting`,
+        { returned, missing },
+      );
+      for (const id of returned) {
         result[id] = fresh[id];
         await writeCache(id, fresh[id]);
       }

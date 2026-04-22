@@ -122,6 +122,13 @@ export async function getWindsAloft(
   try {
     const fresh = await fetchWindsAloft(lat, lon, options);
     if (fresh) {
+      const topLevel = fresh.levels.find((l) => l.speedKt != null);
+      console.log(
+        `[flight-planner] winds-aloft OK @ ${lat.toFixed(1)},${lon.toFixed(1)} forecast ${fresh.forecastTimeIso}`,
+        topLevel
+          ? `sample: ${topLevel.altFt} ft → ${topLevel.dirTrueDeg}° @ ${topLevel.speedKt} kt`
+          : 'no wind data in response',
+      );
       await writeCache(cacheKey, fresh);
       return fresh;
     }

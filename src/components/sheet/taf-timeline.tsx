@@ -48,9 +48,13 @@ export function createTafTimeline(_Shared: SharedDependencies) {
             background: 'rgb(var(--kfp-fg) / 0.04)',
             fontSize: 12,
             color: 'rgb(var(--kfp-fg-muted))',
+            lineHeight: 1.5,
           }}
         >
-          No TAF available{icao ? ` for ${icao}` : ''}.
+          {icao ? `${icao} does not publish a TAF.` : 'No TAF available.'}
+          <br />
+          Smaller airports without forecast service aren't TAF stations — check a
+          nearby larger airport for forecast conditions.
         </div>
       );
     }

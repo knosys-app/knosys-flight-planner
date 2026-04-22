@@ -375,6 +375,15 @@
   background: rgb(var(--kfp-accent) / 0.14);
   color: rgb(var(--kfp-accent));
 }
+/* Buttons styled as chips must re-declare font-size + family because the
+ * user-agent stylesheet sets its own. Higher specificity than .kfp-chip
+ * so they win without !important. */
+button.kfp-chip {
+  font-size: 11px;
+  line-height: 1;
+  font-family: inherit;
+  font-weight: inherit;
+}
 
 /* ========== Bottom sheet ========== */
 

@@ -236,11 +236,48 @@ export function createBriefingCard(Shared: SharedDependencies) {
                 ) : (
                   <span
                     key={alt.icao}
-                    className="kfp-chip"
-                    title={alt.name ?? alt.icao}
-                    style={{ fontSize: 10 }}
+                    title={
+                      alt.name
+                        ? `${alt.icao} · ${alt.name} · no METAR published`
+                        : `${alt.icao} · no METAR published`
+                    }
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      background: 'rgb(var(--kfp-fg) / 0.04)',
+                      border: '1px dashed rgb(var(--kfp-hairline-strong))',
+                      fontSize: 10,
+                      lineHeight: 1.2,
+                      color: 'rgb(var(--kfp-fg-muted))',
+                    }}
                   >
-                    {alt.icao} · {Math.round(alt.distanceNm)} nm
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: 'transparent',
+                        border: '1px solid rgb(var(--kfp-fg-muted))',
+                        flex: '0 0 auto',
+                      }}
+                    />
+                    <span style={{ fontWeight: 600 }}>{alt.icao}</span>
+                    <span style={{ fontFamily: 'var(--kfp-font-mono)' }}>
+                      {Math.round(alt.distanceNm)} nm
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      no wx
+                    </span>
                   </span>
                 );
               })}
@@ -271,7 +308,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
               e.stopPropagation();
               onOpenWindsOverride();
             }}
-            style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
+            style={{ border: 'none', cursor: 'pointer' }}
             title={
               windsOverrideActive
                 ? 'Manual winds are overriding the auto forecast. Click to edit.'
