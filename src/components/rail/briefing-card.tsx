@@ -20,6 +20,7 @@ export interface BriefingCardProps {
   metarsLoading: boolean;
   metarsError: string | null;
   windsOverrideActive: boolean;
+  autoWindsActive: boolean;
 }
 
 function fmtHM(minutes: number): string {
@@ -87,6 +88,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
     metarsLoading,
     metarsError,
     windsOverrideActive,
+    autoWindsActive,
   }) => {
     const lastRow = rows[rows.length - 1];
     const reserveOk = rows.length === 0 || lastRow?.reserveOk !== false;
@@ -216,9 +218,20 @@ export function createBriefingCard(Shared: SharedDependencies) {
               onOpenWindsOverride();
             }}
             style={{ border: 'none', cursor: 'pointer', font: 'inherit' }}
+            title={
+              windsOverrideActive
+                ? 'Manual winds are overriding the auto forecast. Click to edit.'
+                : autoWindsActive
+                  ? 'Auto winds from Open-Meteo. Click to override.'
+                  : 'Click to set manual winds.'
+            }
           >
             {Wind && <Wind className="w-3 h-3" />}
-            {windsOverrideActive ? 'Winds overridden' : 'Override winds'}
+            {windsOverrideActive
+              ? 'Winds overridden'
+              : autoWindsActive
+                ? 'Auto winds'
+                : 'Override winds'}
           </button>
           {metarsError && !depMetar && !arrMetar && (
             <span className="kfp-chip kfp-chip-warn" title={metarsError}>

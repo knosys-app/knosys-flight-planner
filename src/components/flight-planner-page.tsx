@@ -13,6 +13,7 @@ import { createFlightPlannerProvider } from '../hooks/use-flight-planner-store';
 import { createUseRouteProfile } from '../hooks/use-route-profile';
 import { createUseMetars } from '../hooks/use-metars';
 import { createUseTafs } from '../hooks/use-tafs';
+import { createUseAutoWinds } from '../hooks/use-auto-winds';
 import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
@@ -52,6 +53,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const useRouteProfile = createUseRouteProfile(Shared);
   const useMetars = createUseMetars(Shared);
   const useTafs = createUseTafs(Shared);
+  const useAutoWinds = createUseAutoWinds(Shared);
 
   const PlanPill = createPlanPill(Shared);
   const LayersButton = createLayersButton(Shared);
@@ -112,6 +114,10 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const tafs = useTafs(
       plan?.destinationIcao ? [plan.destinationIcao] : [],
     );
+    const autoWinds = useAutoWinds(plan);
+    // Manual winds win when the user has entered any row; otherwise we use
+    // the auto-populated column.
+    const effectiveWinds = winds.length > 0 ? winds : autoWinds.winds;
 
     useEffect(() => {
       (async () => {
@@ -257,13 +263,13 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       return computeNavlog({
         plan,
         aircraft: selectedAircraft,
-        winds,
+        winds: effectiveWinds,
         legWarnings: routeProfile.perLegWarnings,
         departureElevFt: depElev,
         arrivalElevFt: arrElev,
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [plan, selectedAircraft, winds, routeProfile.perLegWarnings, depElev, arrElev]);
+    }, [plan, selectedAircraft, effectiveWinds, routeProfile.perLegWarnings, depElev, arrElev]);
 
     useEffect(() => {
       let cancelled = false;
@@ -402,6 +408,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             metarsLoading={metars.loading}
             metarsError={metars.error}
             windsOverrideActive={winds.length > 0}
+            autoWindsActive={winds.length === 0 && autoWinds.winds.length > 0}
           />
 
           <RailSection title="Route">
@@ -463,7 +470,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               rows={rowsForDisplay}
               samples={routeProfile.samples}
               obstacles={routeProfile.obstacles}
-              winds={winds}
+              winds={effectiveWinds}
               departureElevFt={depElev}
               arrivalElevFt={arrElev}
             />
