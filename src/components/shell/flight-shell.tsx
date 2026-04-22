@@ -26,29 +26,22 @@ export const FlightShell: FC<{
   const chromeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const measure = () => {
+    const rectOf = (el: Element | null | undefined) => {
+      const r = el?.getBoundingClientRect();
+      if (!r) return 'null';
+      return `${Math.round(r.width)}×${Math.round(r.height)} @ ${Math.round(r.x)},${Math.round(r.y)}`;
+    };
+    const measure = (tag: string) => {
       const r = rootRef.current;
       const m = mapRef.current;
       const c = chromeRef.current;
-      console.log('[flight-planner] FlightShell dimensions', {
-        root: r?.getBoundingClientRect(),
-        map: m?.getBoundingClientRect(),
-        chrome: c?.getBoundingClientRect(),
-        parent: r?.parentElement?.getBoundingClientRect(),
-        grandparent: r?.parentElement?.parentElement?.getBoundingClientRect(),
-        rootComputed: r
-          ? {
-              height: getComputedStyle(r).height,
-              width: getComputedStyle(r).width,
-              position: getComputedStyle(r).position,
-              overflow: getComputedStyle(r).overflow,
-              display: getComputedStyle(r).display,
-            }
-          : null,
-      });
+      const cs = r ? getComputedStyle(r) : null;
+      console.log(
+        `[flight-planner] dims[${tag}] root=${rectOf(r)} | map=${rectOf(m)} | chrome=${rectOf(c)} | parent=${rectOf(r?.parentElement)} | gp=${rectOf(r?.parentElement?.parentElement)} | ggp=${rectOf(r?.parentElement?.parentElement?.parentElement)} | cssH=${cs?.height} cssW=${cs?.width} pos=${cs?.position} disp=${cs?.display} ovfl=${cs?.overflow}`,
+      );
     };
-    measure();
-    const t = setTimeout(measure, 200);
+    measure('mount');
+    const t = setTimeout(() => measure('200ms'), 200);
     return () => clearTimeout(t);
   }, []);
 
