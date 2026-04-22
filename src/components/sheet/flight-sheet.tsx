@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SharedDependencies } from '../../types';
 
 export type SheetDetent = 'peek' | 'half' | 'full';
-export type SheetTab = 'block' | 'navlog' | 'profile';
+export type SheetTab = 'block' | 'navlog' | 'profile' | 'wb';
 
 export interface FlightSheetProps {
   detent: SheetDetent;
@@ -13,6 +13,7 @@ export interface FlightSheetProps {
   block: ReactNode;
   navlog: ReactNode;
   profile: ReactNode;
+  wb: ReactNode;
 }
 
 const CYCLE: SheetDetent[] = ['peek', 'half', 'full'];
@@ -66,6 +67,7 @@ export function createFlightSheet(_Shared: SharedDependencies) {
     block,
     navlog,
     profile,
+    wb,
   }) => {
     const sheetRef = useRef<HTMLDivElement | null>(null);
     const dragRef = useRef<DragState | null>(null);
@@ -140,6 +142,7 @@ export function createFlightSheet(_Shared: SharedDependencies) {
       { id: 'block', label: 'Block' },
       { id: 'navlog', label: 'Navlog' },
       { id: 'profile', label: 'Profile' },
+      { id: 'wb', label: 'W&B' },
     ];
 
     const sheetStyle =
@@ -192,6 +195,7 @@ export function createFlightSheet(_Shared: SharedDependencies) {
               {tab === 'block' && block}
               {tab === 'navlog' && navlog}
               {tab === 'profile' && profile}
+              {tab === 'wb' && wb}
             </div>
           </>
         )}

@@ -42,6 +42,7 @@ import {
   type SheetTab,
 } from './sheet/flight-sheet';
 import { createBlockPanel } from './sheet/block-panel';
+import { createWBPanel } from './sheet/wb-panel';
 import { createProfileRibbon } from './profile/profile-ribbon';
 import { createPluginErrorBoundary } from './plugin-error-boundary';
 
@@ -65,6 +66,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const WindsOverrideDialog = createWindsOverrideDialog(Shared);
   const FlightSheet = createFlightSheet(Shared);
   const BlockPanel = createBlockPanel(Shared);
+  const WBPanel = createWBPanel(Shared);
   const ProfileRibbon = createProfileRibbon(Shared);
 
   const PluginErrorBoundary = createPluginErrorBoundary(Shared);
@@ -521,6 +523,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               arrivalElevFt={arrElev}
             />
           }
+          wb={<WBPanel aircraft={selectedAircraft} totals={navlog.blockTotals} />}
         />
 
         <AircraftEditorDialog
