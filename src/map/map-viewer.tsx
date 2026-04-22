@@ -12,7 +12,7 @@ import {
 } from '../constants';
 import { resolvePlanetUrl } from './planet-url';
 import { installCachedPmtilesProtocol } from './cached-pmtiles-protocol';
-import { buildPlanetStyle } from './style-config';
+import { buildPlanetStyle, currentMapTheme } from './style-config';
 import { loadMapViewport, saveMapViewport } from '../store/viewport-store';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import type { SelectedAirportStore } from '../hooks/use-selected-airport';
@@ -52,7 +52,7 @@ export function createMapViewer(Shared: SharedDependencies) {
           if (cancelled) return;
           await installCachedPmtilesProtocol(planetUrl);
           if (cancelled || !containerRef.current) return;
-          const style = buildPlanetStyle(planetUrl);
+          const style = buildPlanetStyle(planetUrl, currentMapTheme());
 
           map = new maplibregl.Map({
             container: containerRef.current,
@@ -125,6 +125,35 @@ export function createMapViewer(Shared: SharedDependencies) {
           mapRef.current = null;
         }
       };
+    }, []);
+
+    // Swap the basemap style when the OS appearance changes. Saved viewport
+    // stays (we only call setStyle; center/zoom/bearing persist). Custom
+    // layers are re-attached on the fresh `styledata` event.
+    useEffect(() => {
+      const media =
+        typeof window !== 'undefined' && window.matchMedia
+          ? window.matchMedia('(prefers-color-scheme: dark)')
+          : null;
+      if (!media) return;
+      const onChange = async () => {
+        const map = mapRef.current;
+        if (!map) return;
+        try {
+          const planetUrl = await resolvePlanetUrl();
+          const next = buildPlanetStyle(planetUrl, currentMapTheme());
+          map.setStyle(next as any, { diff: false });
+          map.once('styledata', () => {
+            runwayLayerRef.current.render(map);
+            markersLayerRef.current?.render(map);
+            routeLayerRef.current.render(map);
+          });
+        } catch {
+          /* keep current style on failure */
+        }
+      };
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
     }, []);
 
     useEffect(() => {
