@@ -12,6 +12,7 @@ import { computeNavlog, hydrateNavlogFrequencies } from '../hooks/use-navlog';
 import { createFlightPlannerProvider } from '../hooks/use-flight-planner-store';
 import { createUseRouteProfile } from '../hooks/use-route-profile';
 import { createUseMetars } from '../hooks/use-metars';
+import { createUseTafs } from '../hooks/use-tafs';
 import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
@@ -50,6 +51,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   } = createSelectedAirportProvider(Shared);
   const useRouteProfile = createUseRouteProfile(Shared);
   const useMetars = createUseMetars(Shared);
+  const useTafs = createUseTafs(Shared);
 
   const PlanPill = createPlanPill(Shared);
   const LayersButton = createLayersButton(Shared);
@@ -107,6 +109,9 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       plan?.departureIcao ?? '',
       plan?.destinationIcao ?? '',
     ].filter(Boolean));
+    const tafs = useTafs(
+      plan?.destinationIcao ? [plan.destinationIcao] : [],
+    );
 
     useEffect(() => {
       (async () => {
@@ -440,6 +445,14 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               loading={routeProfile.loading}
               error={routeProfile.error}
               anyAutoPicked={anyAutoPicked}
+              destinationIcao={plan.destinationIcao || undefined}
+              destinationTaf={
+                plan.destinationIcao
+                  ? (tafs.byIcao[plan.destinationIcao.toUpperCase()] ?? null)
+                  : null
+              }
+              tafLoading={tafs.loading}
+              tafError={tafs.error}
             />
           }
           navlog={<Navlog rows={rowsForDisplay} />}

@@ -5,6 +5,8 @@ import type {
   NavlogWarning,
   SharedDependencies,
 } from '../../types';
+import type { TafForecast } from '../../weather/types';
+import { createTafTimeline } from './taf-timeline';
 
 export interface BlockPanelProps {
   totals: BlockTotals;
@@ -12,6 +14,10 @@ export interface BlockPanelProps {
   loading?: boolean;
   error?: string | null;
   anyAutoPicked: boolean;
+  destinationIcao?: string;
+  destinationTaf?: TafForecast | null;
+  tafLoading?: boolean;
+  tafError?: string | null;
 }
 
 function fmtHM(min: number): string {
@@ -29,6 +35,7 @@ function fmtGal(g: number): string {
 export function createBlockPanel(Shared: SharedDependencies) {
   const { lucideIcons } = Shared;
   const { AlertTriangle, Wand2 } = lucideIcons as Record<string, any>;
+  const TafTimeline = createTafTimeline(Shared);
 
   const BlockPanel: FC<BlockPanelProps> = ({
     totals,
@@ -36,6 +43,10 @@ export function createBlockPanel(Shared: SharedDependencies) {
     loading,
     error,
     anyAutoPicked,
+    destinationIcao,
+    destinationTaf,
+    tafLoading,
+    tafError,
   }) => {
     const warnings = collectWarnings(rows);
     const reserveOk = rows.length === 0 || rows[rows.length - 1]?.reserveOk !== false;
@@ -139,6 +150,20 @@ export function createBlockPanel(Shared: SharedDependencies) {
           >
             Profile error: {error}
           </div>
+        )}
+
+        {destinationIcao && (
+          <section>
+            <div className="kfp-label-caps" style={{ marginBottom: 8 }}>
+              Destination forecast
+            </div>
+            <TafTimeline
+              taf={destinationTaf ?? null}
+              loading={tafLoading}
+              error={tafError}
+              icao={destinationIcao}
+            />
+          </section>
         )}
       </div>
     );

@@ -1,8 +1,24 @@
-// Pure, testable formatters for MetarObservation fields → human strings.
+// Pure, testable formatters for MetarObservation / TafForecastPeriod
+// field subsets → human strings. The helpers accept loose shape objects
+// so the same functions work for both.
 
 import type { CloudLayer, MetarObservation } from './types';
 
-export function fmtWind(m: MetarObservation): string {
+export interface WindFields {
+  windDirDeg: number | null;
+  windSpeedKt: number | null;
+  windGustKt: number | null;
+}
+
+export interface VisibilityFields {
+  visibilitySm: number | null;
+}
+
+export interface CloudFields {
+  clouds: CloudLayer[];
+}
+
+export function fmtWind(m: WindFields): string {
   if (m.windSpeedKt == null && m.windDirDeg == null) return '—';
   if (m.windSpeedKt === 0) return 'Calm';
   const dir = m.windDirDeg == null ? 'VRB' : String(m.windDirDeg).padStart(3, '0');
@@ -11,7 +27,7 @@ export function fmtWind(m: MetarObservation): string {
   return `${dir}° @ ${speed} kt${gust}`;
 }
 
-export function fmtVisibility(m: MetarObservation): string {
+export function fmtVisibility(m: VisibilityFields): string {
   if (m.visibilitySm == null) return '—';
   if (m.visibilitySm === Number.POSITIVE_INFINITY) return '10+ sm';
   return `${m.visibilitySm} sm`;
@@ -34,7 +50,7 @@ export function fmtCloudLayer(c: CloudLayer): string {
   return `${c.coverage} @ ${base}`;
 }
 
-export function fmtClouds(m: MetarObservation): string {
+export function fmtClouds(m: CloudFields): string {
   if (m.clouds.length === 0) return 'Sky clear';
   const clear = m.clouds.find((c) => c.coverage === 'SKC' || c.coverage === 'CLR');
   if (clear) return 'Sky clear';

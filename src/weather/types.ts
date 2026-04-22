@@ -31,3 +31,32 @@ export interface MetarObservation {
   flightCategory: FlightCategory;
   wxString: string | null;
 }
+
+/** A single forecast period within a TAF. */
+export type TafChangeKind = 'BASE' | 'FM' | 'BECMG' | 'TEMPO' | 'PROB';
+
+export interface TafForecastPeriod {
+  startIso: string;
+  endIso: string;
+  change: TafChangeKind;
+  /** When change === 'PROB', the probability percent (30 or 40). */
+  probability: number | null;
+  windDirDeg: number | null;
+  windSpeedKt: number | null;
+  windGustKt: number | null;
+  visibilitySm: number | null;
+  clouds: CloudLayer[];
+  ceilingFtAgl: number | null;
+  flightCategory: FlightCategory;
+  wxString: string | null;
+}
+
+export interface TafForecast {
+  icao: string;
+  issuedAtIso: string;
+  validFromIso: string;
+  validToIso: string;
+  rawText: string;
+  periods: TafForecastPeriod[];
+  fetchedAtIso: string;
+}
