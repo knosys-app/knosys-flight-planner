@@ -96,7 +96,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [firstRunOpen, setFirstRunOpen] = useState(false);
     const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
     const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
-    const [sheetDetent, setSheetDetent] = useState<SheetDetent>('half');
+    const [sheetDetent, setSheetDetent] = useState<SheetDetent>('peek');
     const [sheetTab, setSheetTab] = useState<SheetTab>('profile');
     const lastAppliedAutoAltsRef = useRef<string>('');
 
