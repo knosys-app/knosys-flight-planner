@@ -414,10 +414,10 @@ button.kfp-chip {
 }
 .kfp-sheet[data-detent='half'],
 .kfp-sheet[data-detent='full'] {
-  /* Expanded detents stay 2/3 width + centered so long lines remain
-   * readable on wide monitors (full-width was edge-to-edge). */
-  left: 16.67%;
-  right: 16.67%;
+  /* Expanded detents stay 1/2 width + centered so long lines remain
+   * readable on wide monitors. */
+  left: 25%;
+  right: 25%;
 }
 .kfp-sheet[data-detent='half'] { height: 45vh; }
 .kfp-sheet[data-detent='full'] { height: 90vh; }
