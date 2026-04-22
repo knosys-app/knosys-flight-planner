@@ -37,6 +37,18 @@ export function createBriefingCard(Shared: SharedDependencies) {
     const warningCount = rows.reduce((n, r) => n + (r.warnings?.length ?? 0), 0);
     const hasRoute = rows.length > 0;
 
+    const altitudes = rows
+      .map((r) => r.altFt)
+      .filter((n): n is number => Number.isFinite(n));
+    const minAlt = altitudes.length ? Math.min(...altitudes) : 0;
+    const maxAlt = altitudes.length ? Math.max(...altitudes) : 0;
+    const altText =
+      altitudes.length === 0
+        ? null
+        : minAlt === maxAlt
+          ? `${minAlt.toLocaleString()} ft`
+          : `${minAlt.toLocaleString()}–${maxAlt.toLocaleString()} ft`;
+
     return (
       <div
         role="button"
@@ -68,7 +80,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
 
         <div className="kfp-briefing-sub">
           {hasRoute
-            ? `${totals.blockFuelGal.toFixed(1)} gal · ${totals.blockDistanceNm.toFixed(0)} nm`
+            ? `${totals.blockFuelGal.toFixed(1)} gal · ${totals.blockDistanceNm.toFixed(0)} nm${altText ? ` · ${altText}` : ''}`
             : 'Add waypoints to begin'}
         </div>
 
