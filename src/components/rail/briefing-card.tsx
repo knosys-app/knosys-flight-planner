@@ -12,6 +12,7 @@ export interface AlternateEntry {
   icao: string;
   name?: string;
   distanceNm: number;
+  elevationFt?: number;
 }
 
 export interface BriefingCardProps {
@@ -28,6 +29,8 @@ export interface BriefingCardProps {
   windsOverrideActive: boolean;
   autoWindsActive: boolean;
   alternates: AlternateEntry[];
+  /** ICAO → field elevation in ft MSL. Used for density altitude. */
+  airportElevations: Record<string, number>;
 }
 
 function fmtHM(minutes: number): string {
@@ -97,6 +100,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
     windsOverrideActive,
     autoWindsActive,
     alternates,
+    airportElevations,
   }) => {
     const lastRow = rows[rows.length - 1];
     const reserveOk = rows.length === 0 || lastRow?.reserveOk !== false;
@@ -197,8 +201,20 @@ export function createBriefingCard(Shared: SharedDependencies) {
             className="kfp-briefing-airports"
             style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}
           >
-            {depMetar && <AirportPill icao={dep} metar={depMetar} />}
-            {arrMetar && <AirportPill icao={arr} metar={arrMetar} />}
+            {depMetar && (
+              <AirportPill
+                icao={dep}
+                metar={depMetar}
+                fieldElevFt={airportElevations[dep]}
+              />
+            )}
+            {arrMetar && (
+              <AirportPill
+                icao={arr}
+                metar={arrMetar}
+                fieldElevFt={airportElevations[arr]}
+              />
+            )}
           </div>
         )}
 

@@ -444,7 +444,17 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               icao: a.airport.icao,
               name: a.airport.name,
               distanceNm: a.distanceNm,
+              elevationFt: a.airport.elevationFt,
             }))}
+            airportElevations={{
+              ...airportElevations,
+              ...Object.fromEntries(
+                alternatesResult.alternates.map((a) => [
+                  a.airport.icao,
+                  a.airport.elevationFt,
+                ]),
+              ),
+            }}
           />
 
           <RailSection title="Route">

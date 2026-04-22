@@ -10,6 +10,11 @@ import {
   fmtWind,
   fmtZulu,
 } from '../../weather/metar-format';
+import {
+  computeDensityAltitude,
+  densityAltitudeChip,
+  type DensityAltitudeResult,
+} from '../../math/density-altitude';
 
 const CATEGORY_COLOR: Record<FlightCategory, string> = {
   VFR: 'rgb(60 175 90)',
@@ -19,13 +24,17 @@ const CATEGORY_COLOR: Record<FlightCategory, string> = {
   UNKNOWN: 'rgb(140 140 150)',
 };
 
+export interface AirportPillProps {
+  icao: string;
+  metar: MetarObservation;
+  /** Field elevation in ft MSL — needed for density altitude. */
+  fieldElevFt?: number;
+}
+
 export function createAirportPill(Shared: SharedDependencies) {
   const { Popover, PopoverTrigger, PopoverContent } = Shared;
 
-  const AirportPill: FC<{ icao: string; metar: MetarObservation }> = ({
-    icao,
-    metar,
-  }) => {
+  const AirportPill: FC<AirportPillProps> = ({ icao, metar, fieldElevFt }) => {
     const cat = metar.flightCategory;
     const color = CATEGORY_COLOR[cat];
     const cig =
@@ -37,6 +46,9 @@ export function createAirportPill(Shared: SharedDependencies) {
           ? '10+ sm'
           : `${metar.visibilitySm} sm`;
     const detail = [cig, vis].filter(Boolean).join(' · ') || '—';
+
+    const da = computeDa(metar, fieldElevFt);
+    const daChip = da ? densityAltitudeChip(da) : null;
 
     return (
       <Popover>
@@ -89,6 +101,22 @@ export function createAirportPill(Shared: SharedDependencies) {
             >
               {detail}
             </span>
+            {daChip && (
+              <>
+                <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>·</span>
+                <span
+                  style={{
+                    color:
+                      da && da.deviationFt >= 1500
+                        ? 'rgb(var(--kfp-warn))'
+                        : 'rgb(var(--kfp-fg-muted))',
+                    fontFamily: 'var(--kfp-font-mono)',
+                  }}
+                >
+                  {daChip}
+                </span>
+              </>
+            )}
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -96,9 +124,9 @@ export function createAirportPill(Shared: SharedDependencies) {
           align="start"
           onClick={(e: any) => e.stopPropagation()}
           className="kfp-scope"
-          style={{ width: 320, padding: 0, borderRadius: 14 }}
+          style={{ width: 340, padding: 0, borderRadius: 14 }}
         >
-          <MetarDetail icao={icao} metar={metar} />
+          <MetarDetail icao={icao} metar={metar} da={da} fieldElevFt={fieldElevFt} />
         </PopoverContent>
       </Popover>
     );
@@ -107,7 +135,33 @@ export function createAirportPill(Shared: SharedDependencies) {
   return AirportPill;
 }
 
-const MetarDetail: FC<{ icao: string; metar: MetarObservation }> = ({ icao, metar }) => (
+function computeDa(
+  metar: MetarObservation,
+  fieldElevFt: number | undefined,
+): DensityAltitudeResult | null {
+  if (
+    fieldElevFt == null ||
+    metar.tempC == null ||
+    metar.altimeterInHg == null ||
+    !Number.isFinite(fieldElevFt) ||
+    !Number.isFinite(metar.tempC) ||
+    !Number.isFinite(metar.altimeterInHg)
+  ) {
+    return null;
+  }
+  return computeDensityAltitude({
+    fieldElevFt,
+    tempC: metar.tempC,
+    altimeterInHg: metar.altimeterInHg,
+  });
+}
+
+const MetarDetail: FC<{
+  icao: string;
+  metar: MetarObservation;
+  da: DensityAltitudeResult | null;
+  fieldElevFt?: number;
+}> = ({ icao, metar, da, fieldElevFt }) => (
   <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span
@@ -189,6 +243,39 @@ const MetarDetail: FC<{ icao: string; metar: MetarObservation }> = ({ icao, meta
         <>
           <Label>Weather</Label>
           <Value mono>{metar.wxString}</Value>
+        </>
+      )}
+
+      {fieldElevFt != null && (
+        <>
+          <Label>Field elev</Label>
+          <Value mono>{fieldElevFt.toLocaleString()} ft MSL</Value>
+        </>
+      )}
+
+      {da && (
+        <>
+          <Label>Pressure alt</Label>
+          <Value mono>{da.pressureAltFt.toLocaleString()} ft</Value>
+
+          <Label>Density alt</Label>
+          <Value mono>
+            <span
+              style={{
+                color:
+                  da.deviationFt >= 1500
+                    ? 'rgb(var(--kfp-warn))'
+                    : 'rgb(var(--kfp-fg))',
+              }}
+            >
+              {da.densityAltFt.toLocaleString()} ft
+            </span>
+            <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>
+              {' '}
+              ({da.deviationFt >= 0 ? '+' : '−'}
+              {Math.abs(da.deviationFt).toLocaleString()} vs field)
+            </span>
+          </Value>
         </>
       )}
     </div>
