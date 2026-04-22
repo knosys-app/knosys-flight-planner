@@ -365,6 +365,10 @@
   background: rgb(var(--kfp-danger) / 0.14);
   color: rgb(var(--kfp-danger));
 }
+.kfp-chip-accent {
+  background: rgb(var(--kfp-accent) / 0.14);
+  color: rgb(var(--kfp-accent));
+}
 
 /* ========== Bottom sheet ========== */
 
