@@ -253,10 +253,12 @@
 /* ========== Left rail ========== */
 
 .kfp-rail {
+  /* Rail fills the left side independent of the sheet — the sheet overlaps
+   * the rail visually when it expands, which matches Apple Maps behavior. */
   position: absolute;
   top: 76px;
   left: 16px;
-  bottom: calc(var(--kfp-sheet-detent, 240px) + 16px);
+  bottom: 16px;
   width: 340px;
   display: flex;
   flex-direction: column;
@@ -371,39 +373,57 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: var(--kfp-sheet-height, 45vh);
   transform: translate3d(0, 0, 0);
   transition:
     height var(--kfp-dur-medium) var(--kfp-spring-a),
     transform var(--kfp-dur-medium) var(--kfp-spring-a);
   animation: kfp-fade-up var(--kfp-dur-long) var(--kfp-spring-a) both;
   animation-delay: 160ms;
-  z-index: 2;
+  z-index: 3;
   will-change: height, transform;
 }
-.kfp-sheet[data-detent='peek'] { height: 72px; }
+.kfp-sheet[data-detent='peek'] { height: 28px; }
 .kfp-sheet[data-detent='half'] { height: 45vh; }
 .kfp-sheet[data-detent='full'] { height: 90vh; }
+/* During a drag we use inline height; suppress the spring transition so the
+ * handle tracks the finger 1:1. */
+.kfp-sheet[data-dragging='true'] { transition: none; }
 
 .kfp-sheet-handle {
-  height: 36px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: grab;
+  cursor: ns-resize;
   flex-shrink: 0;
   user-select: none;
   position: relative;
+  touch-action: none;
+}
+/* Larger invisible hit area above the pill so the grab feels roomy. */
+.kfp-sheet-handle::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+.kfp-sheet[data-detent='half'] .kfp-sheet-handle,
+.kfp-sheet[data-detent='full'] .kfp-sheet-handle {
+  height: 32px;
 }
 .kfp-sheet-handle::before {
   content: '';
   width: 40px;
   height: 5px;
   border-radius: 3px;
-  background: rgb(var(--kfp-fg) / 0.22);
-  transition: background var(--kfp-dur-quick) var(--kfp-spring-b);
+  background: rgb(var(--kfp-fg) / 0.26);
+  transition: background var(--kfp-dur-quick) var(--kfp-spring-b),
+              width var(--kfp-dur-quick) var(--kfp-spring-b);
 }
-.kfp-sheet-handle:hover::before { background: rgb(var(--kfp-fg) / 0.36); }
+.kfp-sheet-handle:hover::before,
+.kfp-sheet[data-dragging='true'] .kfp-sheet-handle::before {
+  background: rgb(var(--kfp-fg) / 0.42);
+  width: 52px;
+}
 
 .kfp-sheet-tabs {
   display: flex;

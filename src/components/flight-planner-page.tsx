@@ -355,10 +355,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     };
 
     return (
-      <FlightShell
-        sheetDetent={sheetDetent}
-        map={<MapViewer plan={plan} selectedAirport={selectedAirport} />}
-      >
+      <FlightShell map={<MapViewer plan={plan} selectedAirport={selectedAirport} />}>
         <PlanPill
           plan={plan}
           onRename={setPlanName}
