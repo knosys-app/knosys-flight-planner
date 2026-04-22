@@ -127,22 +127,27 @@ export function createMapViewer(Shared: SharedDependencies) {
       };
     }, []);
 
-    // Swap the basemap style when the OS appearance changes. Saved viewport
-    // stays (we only call setStyle; center/zoom/bearing persist). Custom
-    // layers are re-attached on the fresh `styledata` event.
+    // Swap the basemap style when the effective theme changes — either
+    // because the OS color scheme flipped (matchMedia) or because Knosys
+    // changed its own theme class on <html> (MutationObserver). Saved
+    // viewport persists; custom layers re-attach on styledata.
     useEffect(() => {
+      let lastTheme = currentMapTheme();
       const media =
         typeof window !== 'undefined' && window.matchMedia
           ? window.matchMedia('(prefers-color-scheme: dark)')
           : null;
-      if (!media) return;
-      const onChange = async () => {
+
+      const apply = async () => {
+        const next = currentMapTheme();
+        if (next === lastTheme) return;
+        lastTheme = next;
         const map = mapRef.current;
         if (!map) return;
         try {
           const planetUrl = await resolvePlanetUrl();
-          const next = buildPlanetStyle(planetUrl, currentMapTheme());
-          map.setStyle(next as any, { diff: false });
+          const style = buildPlanetStyle(planetUrl, next);
+          map.setStyle(style as any, { diff: false });
           map.once('styledata', () => {
             runwayLayerRef.current.render(map);
             markersLayerRef.current?.render(map);
@@ -152,8 +157,18 @@ export function createMapViewer(Shared: SharedDependencies) {
           /* keep current style on failure */
         }
       };
-      media.addEventListener('change', onChange);
-      return () => media.removeEventListener('change', onChange);
+
+      const mo = new MutationObserver(() => void apply());
+      mo.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme'],
+      });
+      media?.addEventListener('change', apply);
+
+      return () => {
+        mo.disconnect();
+        media?.removeEventListener('change', apply);
+      };
     }, []);
 
     useEffect(() => {

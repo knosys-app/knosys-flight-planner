@@ -89,6 +89,44 @@
   font-feature-settings: 'ss01', 'ss02', 'cv11';
 }
 
+/* Dark mode signaled either by the host's explicit <html class="dark">
+ * (Knosys ThemeProvider, which applies it whenever effective mode is dark),
+ * or — as a fallback when the plugin runs outside Knosys — by the OS
+ * `prefers-color-scheme: dark` media query. Both blocks apply the same
+ * variable overrides so whichever signal fires, the plugin tracks it. */
+
+html.dark .kfp-root,
+html.dark .kfp-scope,
+html[data-theme='dark'] .kfp-root,
+html[data-theme='dark'] .kfp-scope {
+  --kfp-bg: 14 14 17;
+  --kfp-fg: 235 235 240;
+  --kfp-fg-muted: 150 150 160;
+  --kfp-fg-faint: 100 100 110;
+  --kfp-surface-tint: 30 30 34;
+  --kfp-surface-alpha-thin: 0.62;
+  --kfp-surface-alpha-thick: 0.78;
+  --kfp-hairline: 255 255 255 / 0.10;
+  --kfp-hairline-strong: 255 255 255 / 0.16;
+  --kfp-shadow-lift:
+    0 0.5px 0 rgb(255 255 255 / 0.10) inset,
+    0 1px 2px rgb(0 0 0 / 0.35),
+    0 20px 45px -10px rgb(0 0 0 / 0.55);
+  --kfp-accent: 10 132 255;
+  --kfp-warn: 255 179 64;
+  --kfp-danger: 255 105 97;
+  --kfp-success: 48 209 88;
+  --kfp-terrain-0: 36 72 60;
+  --kfp-terrain-1: 72 92 58;
+  --kfp-terrain-2: 110 100 60;
+  --kfp-terrain-3: 130 95 55;
+  --kfp-terrain-4: 145 70 45;
+  --kfp-terrain-5: 130 55 40;
+  --kfp-terrain-peak: 100 40 40;
+  --kfp-sky-top: 12 28 48;
+  --kfp-sky-bottom: 36 56 82;
+}
+
 @media (prefers-color-scheme: dark) {
   .kfp-root,
   .kfp-scope {
@@ -109,7 +147,6 @@
     --kfp-warn: 255 179 64;
     --kfp-danger: 255 105 97;
     --kfp-success: 48 209 88;
-
     --kfp-terrain-0: 36 72 60;
     --kfp-terrain-1: 72 92 58;
     --kfp-terrain-2: 110 100 60;
@@ -117,10 +154,43 @@
     --kfp-terrain-4: 145 70 45;
     --kfp-terrain-5: 130 55 40;
     --kfp-terrain-peak: 100 40 40;
-
     --kfp-sky-top: 12 28 48;
     --kfp-sky-bottom: 36 56 82;
   }
+}
+
+/* An explicit light class/attribute forces back to light even when the OS
+ * is dark — needed so Knosys mode='light' (its default) keeps the plugin
+ * in light even if the OS is dark. The host sets both <html class> (adds
+ * "dark" only when dark) and data-theme. */
+html:not(.dark)[data-theme='light'] .kfp-root,
+html:not(.dark)[data-theme='light'] .kfp-scope {
+  --kfp-bg: 255 255 255;
+  --kfp-fg: 18 18 22;
+  --kfp-fg-muted: 106 106 114;
+  --kfp-fg-faint: 150 150 158;
+  --kfp-surface-tint: 252 252 253;
+  --kfp-surface-alpha-thin: 0.68;
+  --kfp-surface-alpha-thick: 0.86;
+  --kfp-hairline: 0 0 0 / 0.10;
+  --kfp-hairline-strong: 0 0 0 / 0.16;
+  --kfp-shadow-lift:
+    0 0.5px 0 rgb(255 255 255 / 0.5) inset,
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 12px 30px -10px rgb(0 0 0 / 0.18);
+  --kfp-accent: 0 122 255;
+  --kfp-warn: 255 159 10;
+  --kfp-danger: 255 69 58;
+  --kfp-success: 52 199 89;
+  --kfp-terrain-0: 52 120 100;
+  --kfp-terrain-1: 120 150 90;
+  --kfp-terrain-2: 180 170 100;
+  --kfp-terrain-3: 210 160 90;
+  --kfp-terrain-4: 200 115 70;
+  --kfp-terrain-5: 180 90 60;
+  --kfp-terrain-peak: 140 60 60;
+  --kfp-sky-top: 130 165 210;
+  --kfp-sky-bottom: 210 228 246;
 }
 
 /* ========== Root layout ========== */

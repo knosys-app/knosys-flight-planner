@@ -12,14 +12,28 @@ function spriteUrl(theme: MapTheme): string {
 }
 
 /**
- * Current system color-scheme preference as a MapTheme. Safe at module
- * load — `matchMedia` is available in every modern Electron renderer.
+ * Effective theme for the map. Priority:
+ *   1. `<html class="dark">` or `<html data-theme="dark">` — host (Knosys)
+ *      explicitly requested dark. This is authoritative because the host
+ *      may diverge from OS (e.g. mode='light' forced on a dark OS).
+ *   2. `<html data-theme="light">` — host explicitly requested light.
+ *   3. `prefers-color-scheme: dark` — OS preference, used when the host
+ *      hasn't declared a theme.
  */
 export function currentMapTheme(): MapTheme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
+  if (typeof document !== 'undefined') {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) return 'dark';
+    const attr = html.getAttribute('data-theme');
+    if (attr === 'dark') return 'dark';
+    if (attr === 'light') return 'light';
+  }
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  }
+  return 'light';
 }
 
 /**
