@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { v4 as uuid } from 'uuid';
 import type {
+  Airport,
   AircraftProfile,
   NavlogRow,
   SharedDependencies,
@@ -14,6 +15,7 @@ import { createUseRouteProfile } from '../hooks/use-route-profile';
 import { createUseMetars } from '../hooks/use-metars';
 import { createUseTafs } from '../hooks/use-tafs';
 import { createUseAutoWinds } from '../hooks/use-auto-winds';
+import { createUseAlternates } from '../hooks/use-alternates';
 import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
@@ -54,6 +56,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const useMetars = createUseMetars(Shared);
   const useTafs = createUseTafs(Shared);
   const useAutoWinds = createUseAutoWinds(Shared);
+  const useAlternates = createUseAlternates(Shared);
 
   const PlanPill = createPlanPill(Shared);
   const LayersButton = createLayersButton(Shared);
@@ -103,14 +106,18 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [windsOverrideOpen, setWindsOverrideOpen] = useState(false);
     const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
     const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
+    const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
     const [sheetDetent, setSheetDetent] = useState<SheetDetent>('peek');
     const [sheetTab, setSheetTab] = useState<SheetTab>('profile');
     const lastAppliedAutoAltsRef = useRef<string>('');
 
-    const metars = useMetars([
-      plan?.departureIcao ?? '',
-      plan?.destinationIcao ?? '',
-    ].filter(Boolean));
+    const alternatesResult = useAlternates(destinationAirport);
+    const alternateIcaos = alternatesResult.alternates.map((a) => a.airport.icao);
+    const metars = useMetars(
+      [plan?.departureIcao ?? '', plan?.destinationIcao ?? '', ...alternateIcaos].filter(
+        Boolean,
+      ),
+    );
     const tafs = useTafs(
       plan?.destinationIcao ? [plan.destinationIcao] : [],
     );
@@ -118,6 +125,30 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     // Manual winds win when the user has entered any row; otherwise we use
     // the auto-populated column.
     const effectiveWinds = winds.length > 0 ? winds : autoWinds.winds;
+
+    // Look up the destination Airport object (needed for alternates bbox).
+    useEffect(() => {
+      const icao = plan?.destinationIcao;
+      if (!icao) {
+        setDestinationAirport(null);
+        return;
+      }
+      if (destinationAirport?.icao === icao) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const ds = getAeroDataSource();
+          const a = await ds.findAirportByIcao(icao);
+          if (!cancelled) setDestinationAirport(a);
+        } catch {
+          if (!cancelled) setDestinationAirport(null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [plan?.destinationIcao]);
 
     useEffect(() => {
       (async () => {
@@ -409,6 +440,11 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             metarsError={metars.error}
             windsOverrideActive={winds.length > 0}
             autoWindsActive={winds.length === 0 && autoWinds.winds.length > 0}
+            alternates={alternatesResult.alternates.map((a) => ({
+              icao: a.airport.icao,
+              name: a.airport.name,
+              distanceNm: a.distanceNm,
+            }))}
           />
 
           <RailSection title="Route">

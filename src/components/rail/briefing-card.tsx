@@ -8,6 +8,12 @@ import type {
 import type { FlightCategory, MetarObservation } from '../../weather/types';
 import { createAirportPill } from './airport-pill';
 
+export interface AlternateEntry {
+  icao: string;
+  name?: string;
+  distanceNm: number;
+}
+
 export interface BriefingCardProps {
   plan: Plan;
   totals: BlockTotals;
@@ -21,6 +27,7 @@ export interface BriefingCardProps {
   metarsError: string | null;
   windsOverrideActive: boolean;
   autoWindsActive: boolean;
+  alternates: AlternateEntry[];
 }
 
 function fmtHM(minutes: number): string {
@@ -89,6 +96,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
     metarsError,
     windsOverrideActive,
     autoWindsActive,
+    alternates,
   }) => {
     const lastRow = rows[rows.length - 1];
     const reserveOk = rows.length === 0 || lastRow?.reserveOk !== false;
@@ -194,6 +202,52 @@ export function createBriefingCard(Shared: SharedDependencies) {
           </div>
         )}
 
+        {alternates.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              marginTop: 10,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                color: 'rgb(var(--kfp-fg-muted))',
+              }}
+            >
+              Alternates
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {alternates.map((alt) => {
+                const m = metars[alt.icao];
+                return m ? (
+                  <AlternateMiniPill
+                    key={alt.icao}
+                    icao={alt.icao}
+                    metar={m}
+                    distanceNm={alt.distanceNm}
+                  />
+                ) : (
+                  <span
+                    key={alt.icao}
+                    className="kfp-chip"
+                    title={alt.name ?? alt.icao}
+                    style={{ fontSize: 10 }}
+                  >
+                    {alt.icao} · {Math.round(alt.distanceNm)} nm
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="kfp-briefing-chips" onClick={(e) => e.stopPropagation()}>
           {!reserveOk && (
             <span className="kfp-chip kfp-chip-danger">Below reserve</span>
@@ -242,6 +296,61 @@ export function createBriefingCard(Shared: SharedDependencies) {
       </div>
     );
   };
+
+  function AlternateMiniPill({
+    icao,
+    metar,
+    distanceNm,
+  }: {
+    icao: string;
+    metar: MetarObservation;
+    distanceNm: number;
+  }) {
+    const cat = metar.flightCategory;
+    const color = {
+      VFR: 'rgb(60 175 90)',
+      MVFR: 'rgb(50 140 235)',
+      IFR: 'rgb(230 70 60)',
+      LIFR: 'rgb(160 70 180)',
+      UNKNOWN: 'rgb(140 140 150)',
+    }[cat];
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '3px 8px',
+          borderRadius: 999,
+          background: 'rgb(var(--kfp-surface-tint) / 0.78)',
+          border: '1px solid rgb(var(--kfp-hairline))',
+          fontSize: 10,
+          lineHeight: 1.2,
+        }}
+        title={`${icao} · ${cat} · ${Math.round(distanceNm)} nm`}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: color,
+            flex: '0 0 auto',
+          }}
+        />
+        <span style={{ fontWeight: 600 }}>{icao}</span>
+        <span
+          style={{
+            color: 'rgb(var(--kfp-fg-muted))',
+            fontFamily: 'var(--kfp-font-mono)',
+          }}
+        >
+          {Math.round(distanceNm)} nm
+        </span>
+      </span>
+    );
+  }
 
   return BriefingCard;
 }
