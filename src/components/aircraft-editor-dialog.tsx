@@ -15,10 +15,9 @@ import {
 } from '../constants';
 
 /**
- * v0.5.3: The aircraft profile editor is now a bottom-sheet takeover
- * (via Shared.Sheet, `side="bottom"`) instead of a centered Dialog —
- * this gives us more vertical room for the new W&B sections and matches
- * the sheet-based UX the rest of the plugin uses.
+ * v0.5.3.1: The aircraft profile editor is a large centered modal Dialog
+ * (reverted from the brief bottom-sheet takeover). Its content is otherwise
+ * identical to the sheet version — all the v0.5 W&B sections remain.
  *
  * Exported name is still `createAircraftEditorDialog` for import-stability.
  */
@@ -26,10 +25,10 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
   const {
     useState,
     useEffect,
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
     Input,
     Label,
     Button,
@@ -42,7 +41,7 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
   } = Shared;
   const { Plus, Trash2 } = lucideIcons as Record<string, any>;
 
-  const AircraftEditorSheet: FC<{
+  const AircraftEditor: FC<{
     open: boolean;
     aircraft: AircraftProfile | null;
     onClose: () => void;
@@ -84,22 +83,26 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
     const envelope = form.envelopeCorners ?? [];
 
     return (
-      <Sheet open={open} onOpenChange={(v: boolean) => !v && onClose()}>
-        <SheetContent
-          side="bottom"
+      <Dialog open={open} onOpenChange={(v: boolean) => !v && onClose()}>
+        <DialogContent
           className="kfp-scope flex flex-col p-0"
-          style={{ height: '92vh', maxHeight: '92vh', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+          style={{
+            width: '92vw',
+            maxWidth: 960,
+            maxHeight: '88vh',
+            borderRadius: 18,
+          }}
         >
-          <SheetHeader
+          <DialogHeader
             style={{
               padding: '16px 24px 12px',
               borderBottom: '1px solid rgb(var(--kfp-hairline))',
             }}
           >
-            <SheetTitle>
+            <DialogTitle>
               {aircraft ? 'Edit aircraft' : 'New aircraft'}
-            </SheetTitle>
-          </SheetHeader>
+            </DialogTitle>
+          </DialogHeader>
 
           <div
             style={{
@@ -583,12 +586,12 @@ export function createAircraftEditorDialog(Shared: SharedDependencies) {
               Save
             </Button>
           </footer>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     );
   };
 
-  return AircraftEditorSheet;
+  return AircraftEditor;
 }
 
 // ---------- layout helpers ----------

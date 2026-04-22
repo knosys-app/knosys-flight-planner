@@ -67,8 +67,10 @@ export function createAirportPill(Shared: SharedDependencies) {
               fontSize: 11,
               lineHeight: 1.2,
               cursor: 'pointer',
-              font: 'inherit',
               color: 'inherit',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
             }}
             title={`${icao} · ${cat} · tap for details`}
           >
