@@ -38,19 +38,19 @@ export function createBriefingCard(Shared: SharedDependencies) {
     const hasRoute = rows.length > 0;
 
     return (
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         className="kfp-briefing"
         onClick={onOpenBlock}
-        aria-label="Open block time details"
-        style={{
-          display: 'block',
-          width: '100%',
-          textAlign: 'left',
-          cursor: 'pointer',
-          font: 'inherit',
-          color: 'inherit',
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onOpenBlock();
+          }
         }}
+        aria-label="Open block time details"
+        style={{ cursor: 'pointer' }}
       >
         <div className="kfp-briefing-eyebrow">
           {Plane && <Plane className="w-3 h-3" />}
@@ -95,7 +95,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
             <span className="kfp-chip">Clear</span>
           )}
         </div>
-      </button>
+      </div>
     );
   };
 

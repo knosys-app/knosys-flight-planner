@@ -307,7 +307,8 @@
       transparent 70%),
     rgb(var(--kfp-surface-tint) / 0.8);
   border: 1px solid rgb(var(--kfp-hairline));
-  overflow: hidden;
+  /* border-radius already clips the gradient; no need for overflow: hidden,
+   * which fights the card's height auto-sizing on some browsers. */
 }
 .kfp-briefing-eyebrow {
   display: flex;
