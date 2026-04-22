@@ -5,6 +5,7 @@ import { getAeroDataSource } from '../hooks/use-aero-data';
 import type { AirportQueryOptions } from '../data/aero-data-source';
 
 const SOURCE_ID = 'airport-markers-source';
+const HALO_LAYER = 'airport-markers-halos';
 const CIRCLE_LAYER = 'airport-markers-circles';
 const LABEL_LAYER = 'airport-markers-labels';
 
@@ -53,6 +54,36 @@ export class AirportMarkersLayer implements MapLayer {
       });
     }
 
+    // Translucent halo layer — visible for large/medium airports for
+    // pin-on-map weight, and gives clickable hit area.
+    if (!map.getLayer(HALO_LAYER)) {
+      map.addLayer({
+        id: HALO_LAYER,
+        type: 'circle',
+        source: SOURCE_ID,
+        paint: {
+          'circle-radius': [
+            'match',
+            ['get', 'type'],
+            'large_airport', 12,
+            'medium_airport', 9,
+            'small_airport', 0, // no halo for tiny strips — less visual clutter
+            'seaplane_base', 7,
+            /* default */ 0,
+          ],
+          'circle-color': [
+            'match',
+            ['get', 'type'],
+            'large_airport', '#0A84FF',
+            'medium_airport', '#5AC8FA',
+            'seaplane_base', '#30B0C7',
+            /* default */ '#8E8E93',
+          ],
+          'circle-opacity': 0.18,
+        },
+      });
+    }
+
     if (!map.getLayer(CIRCLE_LAYER)) {
       map.addLayer({
         id: CIRCLE_LAYER,
@@ -62,24 +93,24 @@ export class AirportMarkersLayer implements MapLayer {
           'circle-radius': [
             'match',
             ['get', 'type'],
-            'large_airport', 7,
-            'medium_airport', 5,
+            'large_airport', 6,
+            'medium_airport', 4.5,
             'small_airport', 3,
-            'seaplane_base', 3,
+            'seaplane_base', 3.5,
             /* default */ 3,
           ],
           'circle-color': [
             'match',
             ['get', 'type'],
-            'large_airport', '#1e40af',
-            'medium_airport', '#2563eb',
-            'small_airport', '#64748b',
-            'seaplane_base', '#0d9488',
-            /* default */ '#64748b',
+            'large_airport', '#0A84FF', // SF blue
+            'medium_airport', '#5AC8FA', // SF teal
+            'small_airport', '#8E8E93',  // SF gray
+            'seaplane_base', '#30B0C7',  // SF cyan
+            /* default */ '#8E8E93',
           ],
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.2,
-          'circle-opacity': 0.9,
+          'circle-stroke-width': 1.5,
+          'circle-opacity': 0.98,
         },
       });
     }
@@ -92,15 +123,23 @@ export class AirportMarkersLayer implements MapLayer {
         minzoom: 9,
         layout: {
           'text-field': ['get', 'icao'],
-          'text-size': 11,
-          'text-offset': [0, 1.1],
+          'text-size': [
+            'match',
+            ['get', 'type'],
+            'large_airport', 12,
+            'medium_airport', 11,
+            /* default */ 10,
+          ],
+          'text-offset': [0, 1.25],
           'text-anchor': 'top',
           'text-allow-overlap': false,
+          'text-font': ['Noto Sans Medium'],
         },
         paint: {
-          'text-color': '#1e3a8a',
+          'text-color': '#1c1c1e',
           'text-halo-color': '#ffffff',
-          'text-halo-width': 1.2,
+          'text-halo-width': 1.8,
+          'text-halo-blur': 0.5,
         },
       });
     }
@@ -167,6 +206,7 @@ export class AirportMarkersLayer implements MapLayer {
     if (this.boundOnClick) map.off('click', CIRCLE_LAYER, this.boundOnClick);
     if (map.getLayer(LABEL_LAYER)) map.removeLayer(LABEL_LAYER);
     if (map.getLayer(CIRCLE_LAYER)) map.removeLayer(CIRCLE_LAYER);
+    if (map.getLayer(HALO_LAYER)) map.removeLayer(HALO_LAYER);
     if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
     this.boundOnMoveEnd = null;
     this.boundOnClick = null;
@@ -174,6 +214,7 @@ export class AirportMarkersLayer implements MapLayer {
 
   setVisible(map: MaplibreMap, visible: boolean): void {
     const vis = visible ? 'visible' : 'none';
+    if (map.getLayer(HALO_LAYER)) map.setLayoutProperty(HALO_LAYER, 'visibility', vis);
     if (map.getLayer(CIRCLE_LAYER)) map.setLayoutProperty(CIRCLE_LAYER, 'visibility', vis);
     if (map.getLayer(LABEL_LAYER)) map.setLayoutProperty(LABEL_LAYER, 'visibility', vis);
   }
