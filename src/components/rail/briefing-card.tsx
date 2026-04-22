@@ -6,6 +6,7 @@ import type {
   SharedDependencies,
 } from '../../types';
 import type { FlightCategory, MetarObservation } from '../../weather/types';
+import { createAirportPill } from './airport-pill';
 
 export interface BriefingCardProps {
   plan: Plan;
@@ -72,6 +73,7 @@ export function createBriefingCard(Shared: SharedDependencies) {
     string,
     any
   >;
+  const AirportPill = createAirportPill(Shared);
 
   const BriefingCard: FC<BriefingCardProps> = ({
     plan,
@@ -230,67 +232,3 @@ export function createBriefingCard(Shared: SharedDependencies) {
 
   return BriefingCard;
 }
-
-// ---------- airport pill ----------
-
-const CATEGORY_COLOR: Record<FlightCategory, string> = {
-  VFR: 'rgb(60 175 90)',
-  MVFR: 'rgb(50 140 235)',
-  IFR: 'rgb(230 70 60)',
-  LIFR: 'rgb(160 70 180)',
-  UNKNOWN: 'rgb(140 140 150)',
-};
-
-const AirportPill: FC<{ icao: string; metar: MetarObservation }> = ({
-  icao,
-  metar,
-}) => {
-  const cat = metar.flightCategory;
-  const color = CATEGORY_COLOR[cat];
-  const cig = metar.ceilingFtAgl != null ? `${metar.ceilingFtAgl.toLocaleString()}'` : null;
-  const vis =
-    metar.visibilitySm == null
-      ? null
-      : metar.visibilitySm === Number.POSITIVE_INFINITY
-        ? '10+ sm'
-        : `${metar.visibilitySm} sm`;
-  const detail =
-    [cig, vis].filter(Boolean).join(' · ') || '—';
-  return (
-    <div
-      className="kfp-airport-pill"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '4px 10px',
-        borderRadius: 999,
-        background: 'rgb(var(--kfp-surface-tint) / 0.85)',
-        border: '1px solid rgb(var(--kfp-hairline))',
-        fontSize: 11,
-        lineHeight: 1.2,
-      }}
-      title={metar.rawText}
-    >
-      <span
-        aria-label={`${cat} flight category`}
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: color,
-          flex: '0 0 auto',
-          boxShadow: `0 0 8px ${color}`,
-        }}
-      />
-      <span style={{ fontWeight: 600 }}>{icao}</span>
-      <span style={{ color: 'rgb(var(--kfp-fg-muted))', fontFamily: 'var(--kfp-font-mono)' }}>
-        {cat}
-      </span>
-      <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>·</span>
-      <span style={{ color: 'rgb(var(--kfp-fg))', fontFamily: 'var(--kfp-font-mono)' }}>
-        {detail}
-      </span>
-    </div>
-  );
-};

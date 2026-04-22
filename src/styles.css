@@ -7,7 +7,12 @@
  * Colors: CSS vars with prefers-color-scheme swaps.
  */
 
-.kfp-root {
+/* Token scope — applies to the main .kfp-root and to any portalled popover
+ * whose content is tagged .kfp-scope. Radix popovers mount into document.body
+ * (outside .kfp-root), so their inline CSS var references would resolve to
+ * the initial value without this second selector. */
+.kfp-root,
+.kfp-scope {
   /* Typography */
   --kfp-font-display:
     -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, sans-serif;
@@ -81,7 +86,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .kfp-root {
+  .kfp-root,
+  .kfp-scope {
     --kfp-bg: 14 14 17;
     --kfp-fg: 235 235 240;
     --kfp-fg-muted: 150 150 160;
