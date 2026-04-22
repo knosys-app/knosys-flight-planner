@@ -7,10 +7,44 @@ import { createDashboardWidgets } from './components/dashboard-widget';
 import { ROUTE_PATH, SIDEBAR_ORDER } from './constants';
 
 export function activate(api: PluginAPI, Shared: SharedDependencies) {
+  console.log('[flight-planner] activate() starting (v0.3.2)');
   initStore(api);
   void seedPresetsIfEmpty();
 
-  const FlightPlannerPage = createFlightPlannerPage(Shared);
+  let FlightPlannerPage: ReturnType<typeof createFlightPlannerPage>;
+  try {
+    FlightPlannerPage = createFlightPlannerPage(Shared);
+    console.log('[flight-planner] createFlightPlannerPage OK');
+  } catch (err) {
+    console.error('[flight-planner] createFlightPlannerPage THREW:', err);
+    // Register a visible error component instead of letting activation fail
+    // silently.
+    FlightPlannerPage = (() => (
+      <div
+        style={{
+          padding: 24,
+          background: '#fff6f5',
+          color: '#641e1e',
+          border: '2px solid #c33',
+          fontFamily: '-apple-system, system-ui, sans-serif',
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 700 }}>
+          Flight planner failed to initialize
+        </div>
+        <pre
+          style={{
+            fontSize: 12,
+            fontFamily: 'ui-monospace, Menlo, monospace',
+            marginTop: 8,
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {err instanceof Error ? `${err.name}: ${err.message}\n${err.stack}` : String(err)}
+        </pre>
+      </div>
+    )) as ReturnType<typeof createFlightPlannerPage>;
+  }
   const SettingsPanel = createSettingsPanel(Shared);
   const { RecentPlansWidget, NextFlightWidget } = createDashboardWidgets(Shared);
 

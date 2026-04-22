@@ -272,9 +272,26 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       };
     }, [plan, navlog.rows]);
 
+    console.log('[flight-planner] Inner render', {
+      loading,
+      hasPlan: !!plan,
+      planId: plan?.id,
+      planLegs: plan?.legs?.length,
+      hasAircraft: !!selectedAircraft,
+      aircraftId: selectedAircraft?.id,
+      sheetDetent,
+      sheetTab,
+    });
+
     if (loading) {
       return (
-        <div className="kfp-root" style={{ padding: 32, color: 'rgb(var(--kfp-fg-muted))' }}>
+        <div
+          style={{
+            padding: 32,
+            color: '#666',
+            fontFamily: '-apple-system, system-ui, sans-serif',
+          }}
+        >
           Loading flight planner…
         </div>
       );
@@ -282,7 +299,13 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
     if (!plan || !selectedAircraft) {
       return (
-        <div className="kfp-root" style={{ padding: 32, color: 'rgb(var(--kfp-fg-muted))' }}>
+        <div
+          style={{
+            padding: 32,
+            color: '#666',
+            fontFamily: '-apple-system, system-ui, sans-serif',
+          }}
+        >
           No aircraft profile available. Check plugin settings.
         </div>
       );
@@ -466,15 +489,34 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     );
   };
 
-  const FlightPlannerPage: FC = () => (
-    <PluginErrorBoundary>
-      <Provider>
-        <SelectedAirportProvider>
-          <Inner />
-        </SelectedAirportProvider>
-      </Provider>
-    </PluginErrorBoundary>
-  );
+  const FlightPlannerPage: FC = () => {
+    // Diagnostic scaffold: a neutral wrapper that renders before any of our
+    // plugin CSS or store logic, so if the rest of the tree fails to mount
+    // we can still see that the plugin at least loaded. Remove once v0.3.x
+    // is stable.
+    console.log('[flight-planner] FlightPlannerPage rendering (v0.3.2)');
+    return (
+      <div
+        style={{
+          position: 'relative',
+          height: '100%',
+          width: '100%',
+          overflow: 'hidden',
+          background: 'white',
+        }}
+      >
+        <PluginErrorBoundary label="root">
+          <Provider>
+            <SelectedAirportProvider>
+              <PluginErrorBoundary label="inner">
+                <Inner />
+              </PluginErrorBoundary>
+            </SelectedAirportProvider>
+          </Provider>
+        </PluginErrorBoundary>
+      </div>
+    );
+  };
 
   return FlightPlannerPage;
 }

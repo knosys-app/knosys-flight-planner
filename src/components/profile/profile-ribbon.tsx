@@ -313,8 +313,9 @@ const ObstacleOverlay: FC<{
   const xKey = xAxisMap ? Object.keys(xAxisMap)[0] : null;
   const yKey = yAxisMap ? Object.keys(yAxisMap)[0] : null;
   if (!xKey || !yKey) return null;
-  const xScale = xAxisMap[xKey].scale;
-  const yScale = yAxisMap[yKey].scale;
+  const xScale = xAxisMap?.[xKey]?.scale;
+  const yScale = yAxisMap?.[yKey]?.scale;
+  if (typeof xScale !== 'function' || typeof yScale !== 'function') return null;
   return (
     <g aria-hidden>
       {obstacles.map((o) => {
@@ -347,8 +348,9 @@ const WindBarbOverlay: FC<{
   const xKey = xAxisMap ? Object.keys(xAxisMap)[0] : null;
   const yKey = yAxisMap ? Object.keys(yAxisMap)[0] : null;
   if (!xKey || !yKey) return null;
-  const xScale = xAxisMap[xKey].scale;
-  const yScale = yAxisMap[yKey].scale;
+  const xScale = xAxisMap?.[xKey]?.scale;
+  const yScale = yAxisMap?.[yKey]?.scale;
+  if (typeof xScale !== 'function' || typeof yScale !== 'function') return null;
 
   let along = 0;
   const barbs: Array<{ x: number; y: number; dir: number; kt: number; course: number }> = [];
