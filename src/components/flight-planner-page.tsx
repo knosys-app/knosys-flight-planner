@@ -3,23 +3,18 @@ import { v4 as uuid } from 'uuid';
 import type {
   AircraftProfile,
   NavlogRow,
-  Plan,
   SharedDependencies,
   Waypoint,
 } from '../types';
-import { createEmptyPlan, deletePlan, duplicatePlan, savePlan } from '../store/plan-store';
+import { deletePlan, duplicatePlan } from '../store/plan-store';
 import { saveAircraft } from '../store/aircraft-store';
 import { computeNavlog, hydrateNavlogFrequencies } from '../hooks/use-navlog';
-import {
-  createFlightPlannerProvider,
-  type FlightPlannerStore,
-} from '../hooks/use-flight-planner-store';
+import { createFlightPlannerProvider } from '../hooks/use-flight-planner-store';
 import { createUseRouteProfile } from '../hooks/use-route-profile';
 import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
 
-import { createPlanHeader } from './plan-header';
 import { createAircraftPicker } from './aircraft-picker';
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
 import { createRouteBuilder } from './route-builder';
@@ -30,11 +25,22 @@ import { createPlansList } from './plans-list';
 import { createFirstRunModal } from './first-run-modal';
 import { createAirportDetailSheet } from './airport-detail-sheet';
 import { createMapViewer } from '../map/map-viewer';
-import { createBlockTimeCard } from './block-time-card';
-import { createVerticalProfileModal } from './vertical-profile-modal';
+
+import { FlightShell } from './shell/flight-shell';
+import { createPlanPill } from './shell/plan-pill';
+import { createLayersButton } from './shell/layers-button';
+import { createPlanRail } from './rail/plan-rail';
+import { createBriefingCard } from './rail/briefing-card';
+import {
+  createFlightSheet,
+  type SheetDetent,
+  type SheetTab,
+} from './sheet/flight-sheet';
+import { createBlockPanel } from './sheet/block-panel';
+import { createProfileRibbon } from './profile/profile-ribbon';
 
 export function createFlightPlannerPage(Shared: SharedDependencies) {
-  const { useState, useEffect, useMemo, useRef, Separator } = Shared;
+  const { useState, useEffect, useMemo, useRef } = Shared;
   const { Provider, useFlightPlannerStore } = createFlightPlannerProvider(Shared);
   const {
     Provider: SelectedAirportProvider,
@@ -42,7 +48,14 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   } = createSelectedAirportProvider(Shared);
   const useRouteProfile = createUseRouteProfile(Shared);
 
-  const PlanHeader = createPlanHeader(Shared);
+  const PlanPill = createPlanPill(Shared);
+  const LayersButton = createLayersButton(Shared);
+  const { PlanRail, RailSection } = createPlanRail(Shared);
+  const BriefingCard = createBriefingCard(Shared);
+  const FlightSheet = createFlightSheet(Shared);
+  const BlockPanel = createBlockPanel(Shared);
+  const ProfileRibbon = createProfileRibbon(Shared);
+
   const AircraftPicker = createAircraftPicker(Shared);
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
   const WindsEntry = createWindsEntry(Shared);
@@ -52,8 +65,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const FirstRunModal = createFirstRunModal(Shared);
   const AirportDetailSheet = createAirportDetailSheet(Shared);
   const MapViewer = createMapViewer(Shared);
-  const BlockTimeCard = createBlockTimeCard(Shared);
-  const VerticalProfileModal = createVerticalProfileModal(Shared);
 
   const Inner: FC = () => {
     const store = useFlightPlannerStore();
@@ -67,20 +78,23 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       settings,
       loading,
       setPlan,
+      setPlanName,
       setSelectedAircraft,
       setWinds,
       saveCurrentPlan,
       newPlan,
       openPlan,
       refresh,
+      updateSettings,
     } = store;
 
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingAircraft, setEditingAircraft] = useState<AircraftProfile | null>(null);
     const [firstRunOpen, setFirstRunOpen] = useState(false);
     const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
-    const [profileOpen, setProfileOpen] = useState(false);
     const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
+    const [sheetDetent, setSheetDetent] = useState<SheetDetent>('half');
+    const [sheetTab, setSheetTab] = useState<SheetTab>('profile');
     const lastAppliedAutoAltsRef = useRef<string>('');
 
     useEffect(() => {
@@ -96,8 +110,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       }
     }, [loading, plan, selectedAircraft, newPlan]);
 
-    // Resolve departure/arrival elevations from the aero DB so phase model
-    // can reason about climb-from and descent-to altitudes.
     useEffect(() => {
       if (!plan) return;
       const first = plan.waypoints[0];
@@ -141,8 +153,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const routeProfile = useRouteProfile({ plan, aircraft: selectedAircraft, settings });
 
     // Auto-bump: when a leg has altAutoPicked === true AND the profile hook
-    // has produced a safer altitude, write it back to the plan. Fingerprint
-    // the applied values so we don't loop.
+    // has produced a safer altitude, write it back to the plan.
     useEffect(() => {
       if (!plan || routeProfile.perLegAltitudes.length !== plan.legs.length) return;
       const fingerprint = plan.legs
@@ -259,12 +270,16 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     }, [plan, navlog.rows]);
 
     if (loading) {
-      return <div className="p-8 text-muted-foreground">Loading flight planner…</div>;
+      return (
+        <div className="kfp-root" style={{ padding: 32, color: 'rgb(var(--kfp-fg-muted))' }}>
+          Loading flight planner…
+        </div>
+      );
     }
 
     if (!plan || !selectedAircraft) {
       return (
-        <div className="p-8 text-muted-foreground">
+        <div className="kfp-root" style={{ padding: 32, color: 'rgb(var(--kfp-fg-muted))' }}>
           No aircraft profile available. Check plugin settings.
         </div>
       );
@@ -319,10 +334,19 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const rowsForDisplay = hydratedRows.length > 0 ? hydratedRows : navlog.rows;
     const anyAutoPicked = plan.legs.some((l) => l.altAutoPicked);
 
+    const openBlock = () => {
+      setSheetTab('block');
+      if (sheetDetent === 'peek') setSheetDetent('half');
+    };
+
     return (
-      <div className="flex h-full flex-col">
-        <PlanHeader
-          store={store}
+      <FlightShell
+        sheetDetent={sheetDetent}
+        map={<MapViewer plan={plan} selectedAirport={selectedAirport} />}
+      >
+        <PlanPill
+          plan={plan}
+          onRename={setPlanName}
           onSave={() => void saveCurrentPlan()}
           onNew={newPlan}
           onDuplicate={async () => {
@@ -338,76 +362,85 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           }}
         />
 
-        <div className="flex flex-1 min-h-0">
-          <div
-            className="border-r overflow-auto flex flex-col shrink-0"
-            style={{ width: '33%', maxWidth: 480, minWidth: 320 }}
-          >
-            <div className="p-3 space-y-4">
-              {plan.legs.length > 0 && (
-                <>
-                  <BlockTimeCard
-                    totals={navlog.blockTotals}
-                    rows={rowsForDisplay}
-                    loading={routeProfile.loading}
-                    error={routeProfile.error}
-                    onShowProfile={() => setProfileOpen(true)}
-                    anyAutoPicked={anyAutoPicked}
-                  />
-                  <Separator />
-                </>
-              )}
+        <LayersButton settings={settings} onSettingsChange={updateSettings} />
 
-              <AircraftPicker
-                aircraft={aircraft}
-                selectedId={selectedAircraft.id}
-                onSelect={(id: string) => void setSelectedAircraft(id)}
-                onEdit={() => {
-                  setEditingAircraft(selectedAircraft);
-                  setEditorOpen(true);
-                }}
-              />
+        <PlanRail>
+          <BriefingCard
+            totals={navlog.blockTotals}
+            rows={rowsForDisplay}
+            anyAutoPicked={anyAutoPicked}
+            loading={routeProfile.loading}
+            onOpenBlock={openBlock}
+          />
 
-              <Separator />
+          <RailSection title="Route">
+            <RouteBuilder
+              plan={plan}
+              defaultCruiseAltFt={settings.defaultCruiseAltFt}
+              onChange={setPlan}
+            />
+          </RailSection>
 
-              <RouteBuilder
-                plan={plan}
-                defaultCruiseAltFt={settings.defaultCruiseAltFt}
-                onChange={setPlan}
-              />
-
-              <Separator />
-
-              <WindsEntry winds={winds} onChange={setWinds} />
-
-              <Separator />
-
-              <div>
-                <div className="font-medium text-sm mb-1">Navlog</div>
-                <Navlog rows={rowsForDisplay} />
+          <RailSection title="Aircraft">
+            <AircraftPicker
+              aircraft={aircraft}
+              selectedId={selectedAircraft.id}
+              onSelect={(id: string) => void setSelectedAircraft(id)}
+              onEdit={() => {
+                setEditingAircraft(selectedAircraft);
+                setEditorOpen(true);
+              }}
+            />
+            <details style={{ marginTop: 10 }}>
+              <summary
+                className="kfp-label-caps"
+                style={{ cursor: 'pointer', padding: '4px 0' }}
+              >
+                Manual winds override
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                <WindsEntry winds={winds} onChange={setWinds} />
               </div>
+            </details>
+          </RailSection>
 
-              <Separator />
+          <RailSection title="Saved plans">
+            <PlansList plans={plans} currentId={plan.id} onOpen={openPlan} />
+          </RailSection>
 
-              <ExportBar
-                plan={plan}
-                aircraft={selectedAircraft}
-                navlog={rowsForDisplay}
-              />
+          <RailSection title="Export" defaultOpen={false}>
+            <ExportBar plan={plan} aircraft={selectedAircraft} navlog={rowsForDisplay} />
+          </RailSection>
+        </PlanRail>
 
-              <Separator />
-
-              <div>
-                <div className="font-medium text-sm mb-2">Saved plans</div>
-                <PlansList plans={plans} currentId={plan.id} onOpen={openPlan} />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 relative">
-            <MapViewer plan={plan} selectedAirport={selectedAirport} />
-          </div>
-        </div>
+        <FlightSheet
+          detent={sheetDetent}
+          onDetentChange={setSheetDetent}
+          tab={sheetTab}
+          onTabChange={setSheetTab}
+          block={
+            <BlockPanel
+              totals={navlog.blockTotals}
+              rows={rowsForDisplay}
+              loading={routeProfile.loading}
+              error={routeProfile.error}
+              anyAutoPicked={anyAutoPicked}
+            />
+          }
+          navlog={<Navlog rows={rowsForDisplay} />}
+          profile={
+            <ProfileRibbon
+              plan={plan}
+              aircraft={selectedAircraft}
+              rows={rowsForDisplay}
+              samples={routeProfile.samples}
+              obstacles={routeProfile.obstacles}
+              winds={winds}
+              departureElevFt={depElev}
+              arrivalElevFt={arrElev}
+            />
+          }
+        />
 
         <AircraftEditorDialog
           open={editorOpen}
@@ -426,19 +459,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         />
 
         <AirportDetailSheet store={selectedAirport} onAddToRoute={appendWaypoint} />
-
-        <VerticalProfileModal
-          open={profileOpen}
-          onClose={() => setProfileOpen(false)}
-          plan={plan}
-          aircraft={selectedAircraft}
-          rows={rowsForDisplay}
-          samples={routeProfile.samples}
-          obstacles={routeProfile.obstacles}
-          departureElevFt={depElev}
-          arrivalElevFt={arrElev}
-        />
-      </div>
+      </FlightShell>
     );
   };
 
