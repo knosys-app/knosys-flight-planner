@@ -403,17 +403,10 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
                 setEditorOpen(true);
               }}
             />
-            <details style={{ marginTop: 10 }}>
-              <summary
-                className="kfp-label-caps"
-                style={{ cursor: 'pointer', padding: '4px 0' }}
-              >
-                Manual winds override
-              </summary>
-              <div style={{ marginTop: 8 }}>
-                <WindsEntry winds={winds} onChange={setWinds} />
-              </div>
-            </details>
+          </RailSection>
+
+          <RailSection title="Winds override" defaultOpen={false}>
+            <WindsEntry winds={winds} onChange={setWinds} />
           </RailSection>
 
           <RailSection title="Saved plans">

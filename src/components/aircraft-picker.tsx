@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import type { AircraftProfile, SharedDependencies } from '../types';
 
 export function createAircraftPicker(Shared: SharedDependencies) {
-  const { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, Label, lucideIcons } = Shared;
+  const { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, lucideIcons } = Shared;
   const { Pencil } = lucideIcons as Record<string, any>;
 
   const AircraftPicker: FC<{
@@ -12,11 +12,17 @@ export function createAircraftPicker(Shared: SharedDependencies) {
     onEdit: () => void;
   }> = ({ aircraft, selectedId, onSelect, onEdit }) => {
     return (
-      <div className="space-y-2">
-        <Label>Aircraft</Label>
-        <div className="flex gap-2">
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'stretch',
+          minWidth: 0,
+        }}
+      >
+        <div style={{ flex: '1 1 0', minWidth: 0 }}>
           <Select value={selectedId ?? undefined} onValueChange={onSelect}>
-            <SelectTrigger className="flex-1">
+            <SelectTrigger style={{ width: '100%', minWidth: 0 }}>
               <SelectValue placeholder="Choose aircraft" />
             </SelectTrigger>
             <SelectContent>
@@ -30,10 +36,16 @@ export function createAircraftPicker(Shared: SharedDependencies) {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={onEdit} title="Edit profile">
-            {Pencil && <Pencil className="w-4 h-4" />}
-          </Button>
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onEdit}
+          title="Edit profile"
+          style={{ flex: '0 0 auto' }}
+        >
+          {Pencil && <Pencil className="w-4 h-4" />}
+        </Button>
       </div>
     );
   };
