@@ -7,14 +7,12 @@ import { createDashboardWidgets } from './components/dashboard-widget';
 import { ROUTE_PATH, SIDEBAR_ORDER } from './constants';
 
 export function activate(api: PluginAPI, Shared: SharedDependencies) {
-  console.log('[flight-planner] activate() starting (v0.3.2)');
   initStore(api);
   void seedPresetsIfEmpty();
 
   let FlightPlannerPage: ReturnType<typeof createFlightPlannerPage>;
   try {
     FlightPlannerPage = createFlightPlannerPage(Shared);
-    console.log('[flight-planner] createFlightPlannerPage OK');
   } catch (err) {
     console.error('[flight-planner] createFlightPlannerPage THREW:', err);
     // Register a visible error component instead of letting activation fail

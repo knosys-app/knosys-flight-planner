@@ -116,11 +116,11 @@
 /* ========== Root layout ========== */
 
 .kfp-root {
+  /* height is set inline by FlightShell via measured viewport space — the
+   * Knosys host's flex chain uses min-height, not height, so CSS percentage
+   * height can't resolve. See src/components/shell/flight-shell.tsx. */
   position: relative;
-  height: 100%;
   width: 100%;
-  min-height: 600px; /* safety net if the parent height chain collapses */
-  flex: 1 1 auto;
   overflow: hidden;
   background: rgb(var(--kfp-bg));
 }

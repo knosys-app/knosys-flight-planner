@@ -272,17 +272,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       };
     }, [plan, navlog.rows]);
 
-    console.log('[flight-planner] Inner render', {
-      loading,
-      hasPlan: !!plan,
-      planId: plan?.id,
-      planLegs: plan?.legs?.length,
-      hasAircraft: !!selectedAircraft,
-      aircraftId: selectedAircraft?.id,
-      sheetDetent,
-      sheetTab,
-    });
-
     if (loading) {
       return (
         <div
@@ -489,34 +478,17 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     );
   };
 
-  const FlightPlannerPage: FC = () => {
-    // Diagnostic scaffold: a neutral wrapper that renders before any of our
-    // plugin CSS or store logic, so if the rest of the tree fails to mount
-    // we can still see that the plugin at least loaded. Remove once v0.3.x
-    // is stable.
-    console.log('[flight-planner] FlightPlannerPage rendering (v0.3.2)');
-    return (
-      <div
-        style={{
-          position: 'relative',
-          height: '100%',
-          width: '100%',
-          overflow: 'hidden',
-          background: 'white',
-        }}
-      >
-        <PluginErrorBoundary label="root">
-          <Provider>
-            <SelectedAirportProvider>
-              <PluginErrorBoundary label="inner">
-                <Inner />
-              </PluginErrorBoundary>
-            </SelectedAirportProvider>
-          </Provider>
-        </PluginErrorBoundary>
-      </div>
-    );
-  };
+  const FlightPlannerPage: FC = () => (
+    <PluginErrorBoundary label="root">
+      <Provider>
+        <SelectedAirportProvider>
+          <PluginErrorBoundary label="inner">
+            <Inner />
+          </PluginErrorBoundary>
+        </SelectedAirportProvider>
+      </Provider>
+    </PluginErrorBoundary>
+  );
 
   return FlightPlannerPage;
 }

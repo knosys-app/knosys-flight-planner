@@ -1,5 +1,5 @@
 import type { CSSProperties, FC, ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SheetDetent } from '../sheet/flight-sheet';
 
 function detentCssHeight(d: SheetDetent): string {
@@ -11,10 +11,18 @@ function detentCssHeight(d: SheetDetent): string {
 }
 
 /**
- * Root layout shell: full-bleed map layer + chrome layer for floating UI.
- * v0.3.3 diagnostic: measures its own dimensions on mount + renders a red
- * banner inside the chrome layer so we can tell from looking at the page
- * whether the shell is reaching the DOM and has non-zero size.
+ * Root layout shell: full-bleed map + chrome overlay.
+ *
+ * The v0.3.0 regression was that this shell renders both children with
+ * `position: absolute; inset: 0`, so `.kfp-root` has zero intrinsic
+ * height. In the Knosys host flex tree, `height: 100%` does NOT resolve
+ * through every ancestor (SidebarProvider uses min-height, not height),
+ * so `.kfp-root` computed to 0×0 and the whole plugin was invisible.
+ *
+ * Fix: measure the viewport at mount and pin the root's height to
+ * `window.innerHeight - getBoundingClientRect().top`. That's the real
+ * available space below where we mount, regardless of how the host
+ * cascade behaves. Re-measure on resize.
  */
 export const FlightShell: FC<{
   map: ReactNode;
@@ -22,56 +30,35 @@ export const FlightShell: FC<{
   children?: ReactNode;
 }> = ({ map, sheetDetent, children }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
-  const chromeRef = useRef<HTMLDivElement | null>(null);
+  const [fittedHeight, setFittedHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    const rectOf = (el: Element | null | undefined) => {
-      const r = el?.getBoundingClientRect();
-      if (!r) return 'null';
-      return `${Math.round(r.width)}×${Math.round(r.height)} @ ${Math.round(r.x)},${Math.round(r.y)}`;
+    const fit = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const h = Math.max(200, window.innerHeight - top);
+      setFittedHeight(h);
     };
-    const measure = (tag: string) => {
-      const r = rootRef.current;
-      const m = mapRef.current;
-      const c = chromeRef.current;
-      const cs = r ? getComputedStyle(r) : null;
-      console.log(
-        `[flight-planner] dims[${tag}] root=${rectOf(r)} | map=${rectOf(m)} | chrome=${rectOf(c)} | parent=${rectOf(r?.parentElement)} | gp=${rectOf(r?.parentElement?.parentElement)} | ggp=${rectOf(r?.parentElement?.parentElement?.parentElement)} | cssH=${cs?.height} cssW=${cs?.width} pos=${cs?.position} disp=${cs?.display} ovfl=${cs?.overflow}`,
-      );
+    fit();
+    // Re-measure shortly after mount (layout may settle) and on viewport resize.
+    const t = setTimeout(fit, 50);
+    window.addEventListener('resize', fit);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', fit);
     };
-    measure('mount');
-    const t = setTimeout(() => measure('200ms'), 200);
-    return () => clearTimeout(t);
   }, []);
 
-  const style = {
+  const style: CSSProperties = {
     ['--kfp-sheet-detent' as any]: detentCssHeight(sheetDetent),
-  } as CSSProperties;
+    height: fittedHeight != null ? `${fittedHeight}px` : '100%',
+  };
+
   return (
     <div ref={rootRef} className="kfp-root" style={style}>
-      <div ref={mapRef} className="kfp-map-layer">{map}</div>
-      <div ref={chromeRef} className="kfp-chrome-layer">
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 999,
-            padding: '10px 16px',
-            background: '#c33',
-            color: 'white',
-            fontFamily: '-apple-system, sans-serif',
-            fontSize: 13,
-            fontWeight: 600,
-            pointerEvents: 'auto',
-          }}
-        >
-          v0.3.3 DIAGNOSTIC BANNER — if you see this red bar, FlightShell rendered into the DOM.
-        </div>
-        {children}
-      </div>
+      <div className="kfp-map-layer">{map}</div>
+      <div className="kfp-chrome-layer">{children}</div>
     </div>
   );
 };
