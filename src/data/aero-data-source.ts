@@ -20,4 +20,6 @@ export interface AeroDataSource {
    * then fetch the full airport when the user clicks a marker.
    */
   airportsInBboxLite(bbox: BoundingBox, opts?: AirportQueryOptions): Promise<Airport[]>;
+  /** Navaids in a lat/lon bbox. Used by the map navaids layer. */
+  navaidsInBbox(bbox: BoundingBox, limit?: number): Promise<Navaid[]>;
 }

@@ -309,9 +309,11 @@ html:not(.dark)[data-theme='light'] .kfp-scope {
 .kfp-layers-btn:active { transform: scale(0.96); }
 
 .kfp-layers-menu {
-  width: 280px;
+  width: 300px;
   padding: 6px;
   border-radius: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .kfp-layers-item {
@@ -735,4 +737,50 @@ button.kfp-chip {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ========== Waypoint pin-drop (map marker, outside .kfp-root) ==========
+ * Rendered by maplibregl.Marker in map-viewer.tsx on append. Lives outside
+ * the plugin scope, so selectors don't carry the .kfp-root prefix. */
+.kfp-pin-drop {
+  width: 22px;
+  height: 28px;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  animation: kfp-pin-drop-in 900ms cubic-bezier(0.22, 1.2, 0.36, 1) both,
+             kfp-pin-drop-fade 300ms ease 900ms both;
+}
+.kfp-pin-drop::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: #0A84FF;
+  box-shadow:
+    0 0 0 3px rgba(10, 132, 255, 0.22),
+    0 6px 14px rgba(10, 132, 255, 0.45);
+}
+.kfp-pin-drop::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 6px;
+  height: 10px;
+  margin-left: -3px;
+  background: #0A84FF;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+@keyframes kfp-pin-drop-in {
+  0% { transform: translateY(-56px) scale(0.8); opacity: 0; }
+  55% { transform: translateY(0) scale(1.08); opacity: 1; }
+  75% { transform: translateY(-4px) scale(0.98); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes kfp-pin-drop-fade {
+  to { opacity: 0; transform: translateY(-2px) scale(0.94); }
 }

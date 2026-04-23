@@ -260,6 +260,52 @@ export class SqlJsAeroDataSource implements AeroDataSource {
     }
   }
 
+  async navaidsInBbox(bbox: BoundingBox, limit = 300): Promise<Navaid[]> {
+    await this.ready();
+    const db = this.requireDb();
+    const [west, south, east, north] = bbox;
+    const stmt = db.prepare(
+      `SELECT ident, name, type, latitude_deg, longitude_deg, elevation_ft, frequency_khz
+       FROM navaids
+       WHERE longitude_deg BETWEEN :west AND :east
+         AND latitude_deg BETWEEN :south AND :north
+       LIMIT :limit`,
+    );
+    try {
+      stmt.bind({
+        ':west': west,
+        ':east': east,
+        ':south': south,
+        ':north': north,
+        ':limit': limit,
+      });
+      const out: Navaid[] = [];
+      while (stmt.step()) {
+        const r = stmt.getAsObject() as {
+          ident: string;
+          name: string;
+          type: string;
+          latitude_deg: number;
+          longitude_deg: number;
+          elevation_ft: number | null;
+          frequency_khz: number | null;
+        };
+        out.push({
+          id: r.ident,
+          name: r.name,
+          type: (r.type?.toUpperCase() as any) ?? 'VOR',
+          lat: r.latitude_deg,
+          lon: r.longitude_deg,
+          elevationFt: r.elevation_ft ?? undefined,
+          freq: r.frequency_khz ? r.frequency_khz / 1000 : undefined,
+        });
+      }
+      return out;
+    } finally {
+      stmt.free();
+    }
+  }
+
   async airportsInBbox(bbox: BoundingBox, opts: AirportQueryOptions = {}): Promise<Airport[]> {
     const rows = await this.bboxRows(bbox, opts);
     return rows.map((r) => this.hydrateAirport(r));

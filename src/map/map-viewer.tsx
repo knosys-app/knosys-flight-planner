@@ -1,9 +1,11 @@
 import type { FC } from 'react';
 import maplibregl, { type Map as MaplibreMap } from 'maplibre-gl';
-import type { Plan, SharedDependencies } from '../types';
+import type { Plan, RouteProfile, SharedDependencies } from '../types';
 import { ensureMaplibreWorker } from './maplibre-worker-setup';
 import { RouteMapLayer } from './route-map-layer';
 import { AirportMarkersLayer } from './airport-markers-layer';
+import { AirspaceLayer } from './airspace-layer';
+import { NavaidsLayer } from './navaids-layer';
 import { RunwayOverlayLayer } from './runway-overlay-layer';
 import {
   DEFAULT_MAP_CENTER,
@@ -17,18 +19,35 @@ import { loadMapViewport, saveMapViewport } from '../store/viewport-store';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import type { SelectedAirportStore } from '../hooks/use-selected-airport';
 
+export interface LayerVisibilityProp {
+  airports: boolean;
+  navaids: boolean;
+  airspace: boolean;
+}
+
 export function createMapViewer(Shared: SharedDependencies) {
   const { useEffect, useRef, useState } = Shared;
 
   const MapViewer: FC<{
     plan: Plan | null;
+    routeProfile?: RouteProfile | null;
     selectedAirport: SelectedAirportStore;
-  }> = ({ plan, selectedAirport }) => {
+    layerVisibility: LayerVisibilityProp;
+  }> = ({ plan, routeProfile, selectedAirport, layerVisibility }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MaplibreMap | null>(null);
     const routeLayerRef = useRef<RouteMapLayer>(new RouteMapLayer());
     const runwayLayerRef = useRef<RunwayOverlayLayer>(new RunwayOverlayLayer());
     const markersLayerRef = useRef<AirportMarkersLayer | null>(null);
+    const airspaceLayerRef = useRef<AirspaceLayer>(new AirspaceLayer());
+    const navaidsLayerRef = useRef<NavaidsLayer | null>(null);
+    const lastWaypointCountRef = useRef<number>(-1);
+    const lastWaypointIdRef = useRef<string | null>(null);
+    const pinMarkerRef = useRef<maplibregl.Marker | null>(null);
+    // Latest visibility — read inside the theme-swap handler so a style
+    // swap doesn't need to re-subscribe MutationObserver on every toggle.
+    const visibilityRef = useRef(layerVisibility);
+    visibilityRef.current = layerVisibility;
     const [error, setError] = useState<string | null>(null);
 
     // Hold a stable reference to the selected-airport store so marker click
@@ -90,12 +109,29 @@ export function createMapViewer(Shared: SharedDependencies) {
           });
           markersLayerRef.current = markersLayer;
 
+          const navaidsLayer = new NavaidsLayer(async (id: string) => {
+            try {
+              const ds = getAeroDataSource();
+              const nv = await ds.findNavaid(id);
+              if (nv) selectedStoreRef.current.setNavaid(nv);
+            } catch {
+              /* ignore */
+            }
+          });
+          navaidsLayerRef.current = navaidsLayer;
+
           map.on('load', () => {
             if (cancelled || !map) return;
-            // Draw order: runways (bottom) -> airport markers -> route line on top.
+            // Draw order: airspace → runways → navaids → airport markers → route line.
+            airspaceLayerRef.current.render(map);
+            airspaceLayerRef.current.setVisible(map, layerVisibility.airspace);
             runwayLayerRef.current.render(map);
+            navaidsLayer.render(map);
+            navaidsLayer.setVisible(map, layerVisibility.navaids);
             markersLayer.render(map);
+            markersLayer.setVisible(map, layerVisibility.airports);
             routeLayerRef.current.setPlan(plan);
+            routeLayerRef.current.setProfile(routeProfile ?? null);
             routeLayerRef.current.render(map);
           });
           map.on('moveend', () => {
@@ -120,11 +156,16 @@ export function createMapViewer(Shared: SharedDependencies) {
 
       return () => {
         cancelled = true;
+        if (pinMarkerRef.current) {
+          pinMarkerRef.current.remove();
+          pinMarkerRef.current = null;
+        }
         if (mapRef.current) {
           mapRef.current.remove();
           mapRef.current = null;
         }
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Swap the basemap style when the effective theme changes — either
@@ -149,8 +190,18 @@ export function createMapViewer(Shared: SharedDependencies) {
           const style = buildPlanetStyle(planetUrl, next);
           map.setStyle(style as any, { diff: false });
           map.once('styledata', () => {
+            const vis = visibilityRef.current;
+            airspaceLayerRef.current.render(map);
+            airspaceLayerRef.current.setVisible(map, vis.airspace);
             runwayLayerRef.current.render(map);
+            navaidsLayerRef.current?.render(map);
+            if (navaidsLayerRef.current) {
+              navaidsLayerRef.current.setVisible(map, vis.navaids);
+            }
             markersLayerRef.current?.render(map);
+            if (markersLayerRef.current) {
+              markersLayerRef.current.setVisible(map, vis.airports);
+            }
             routeLayerRef.current.render(map);
           });
         } catch {
@@ -171,10 +222,27 @@ export function createMapViewer(Shared: SharedDependencies) {
       };
     }, []);
 
+    // Respond to layer toggles.
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      if (map.getLayer('airspace-fill') || !layerVisibility.airspace) {
+        airspaceLayerRef.current.setVisible(map, layerVisibility.airspace);
+      }
+      if (markersLayerRef.current) {
+        markersLayerRef.current.setVisible(map, layerVisibility.airports);
+      }
+      if (navaidsLayerRef.current) {
+        navaidsLayerRef.current.setVisible(map, layerVisibility.navaids);
+      }
+    }, [layerVisibility.airspace, layerVisibility.airports, layerVisibility.navaids]);
+
+    // Route + profile updates.
     useEffect(() => {
       const map = mapRef.current;
       if (!map) return;
       routeLayerRef.current.setPlan(plan);
+      routeLayerRef.current.setProfile(routeProfile ?? null);
       const render = () => {
         routeLayerRef.current.update(map);
         if (plan && plan.waypoints.length > 1) {
@@ -191,7 +259,38 @@ export function createMapViewer(Shared: SharedDependencies) {
       } else {
         map.once('load', render);
       }
-    }, [plan]);
+    }, [plan, routeProfile]);
+
+    // Pin-drop animation on waypoint append. Fires only when the plan
+    // grew by one waypoint — not on removal, replacement, or first mount.
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !plan || plan.waypoints.length === 0) return;
+      const count = plan.waypoints.length;
+      const last = plan.waypoints[count - 1];
+      const prevCount = lastWaypointCountRef.current;
+      const prevId = lastWaypointIdRef.current;
+      lastWaypointCountRef.current = count;
+      lastWaypointIdRef.current = last.id;
+
+      const isAppend = prevCount >= 0 && count === prevCount + 1 && prevId !== last.id;
+      if (!isAppend) return;
+
+      const el = document.createElement('div');
+      el.className = 'kfp-pin-drop';
+      if (pinMarkerRef.current) pinMarkerRef.current.remove();
+      pinMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([last.lon, last.lat])
+        .addTo(map);
+      const timer = setTimeout(() => {
+        if (pinMarkerRef.current) {
+          pinMarkerRef.current.remove();
+          pinMarkerRef.current = null;
+        }
+      }, 1200);
+      return () => clearTimeout(timer);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [plan?.waypoints.length, plan?.waypoints[plan.waypoints.length - 1]?.id]);
 
     // Reflect selected airport on the runway overlay layer.
     useEffect(() => {

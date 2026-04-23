@@ -431,6 +431,13 @@ export interface RouteProfile {
   perLegWarnings: NavlogWarning[][];
 }
 
+/** Per-layer visibility on the map. Undefined keys fall back to defaults. */
+export interface LayerVisibility {
+  airports?: boolean;
+  navaids?: boolean;
+  airspace?: boolean;
+}
+
 export interface PluginSettings {
   schemaVersion: 1;
   units: 'us' | 'metric';
@@ -445,6 +452,8 @@ export interface PluginSettings {
   /** When set, plugin has downloaded the FAA DOF-derived obstacles.sqlite. */
   obstaclesDbVersion?: string;
   obstaclesDbInstalledAt?: string;
+  /** Per-layer visibility toggles (map layers menu). */
+  layers?: LayerVisibility;
 }
 
 export interface InstalledMapRegion {

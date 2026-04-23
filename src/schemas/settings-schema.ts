@@ -12,6 +12,14 @@ export const PluginSettingsSchema = z.object({
   obstaclesEnabled: z.boolean().default(false).optional(),
   obstaclesDbVersion: z.string().optional(),
   obstaclesDbInstalledAt: z.string().datetime().optional(),
+  layers: z
+    .object({
+      airports: z.boolean().optional(),
+      navaids: z.boolean().optional(),
+      airspace: z.boolean().optional(),
+    })
+    .partial()
+    .optional(),
 });
 
 export const InstalledMapRegionSchema = z.object({
