@@ -33,7 +33,13 @@ export function createMapViewer(Shared: SharedDependencies) {
     routeProfile?: RouteProfile | null;
     selectedAirport: SelectedAirportStore;
     layerVisibility: LayerVisibilityProp;
-  }> = ({ plan, routeProfile, selectedAirport, layerVisibility }) => {
+    /**
+     * Along-track scrub position (nm) shared with timeline + profile. When
+     * set, a translucent cursor marker slides along the route. `null`
+     * hides the cursor.
+     */
+    scrubAlongNm?: number | null;
+  }> = ({ plan, routeProfile, selectedAirport, layerVisibility, scrubAlongNm }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MaplibreMap | null>(null);
     const routeLayerRef = useRef<RouteMapLayer>(new RouteMapLayer());
@@ -44,6 +50,7 @@ export function createMapViewer(Shared: SharedDependencies) {
     const lastWaypointCountRef = useRef<number>(-1);
     const lastWaypointIdRef = useRef<string | null>(null);
     const pinMarkerRef = useRef<maplibregl.Marker | null>(null);
+    const scrubMarkerRef = useRef<maplibregl.Marker | null>(null);
     // Latest visibility — read inside the theme-swap handler so a style
     // swap doesn't need to re-subscribe MutationObserver on every toggle.
     const visibilityRef = useRef(layerVisibility);
@@ -159,6 +166,10 @@ export function createMapViewer(Shared: SharedDependencies) {
         if (pinMarkerRef.current) {
           pinMarkerRef.current.remove();
           pinMarkerRef.current = null;
+        }
+        if (scrubMarkerRef.current) {
+          scrubMarkerRef.current.remove();
+          scrubMarkerRef.current = null;
         }
         if (mapRef.current) {
           mapRef.current.remove();
@@ -291,6 +302,50 @@ export function createMapViewer(Shared: SharedDependencies) {
       return () => clearTimeout(timer);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [plan?.waypoints.length, plan?.waypoints[plan.waypoints.length - 1]?.id]);
+
+    // Scrub cursor — slides a translucent marker along the route as the
+    // user scrubs the timeline or hovers the profile ribbon. Position is
+    // interpolated from routeProfile samples (lat/lon + alongTrackNm).
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      const samples = routeProfile?.samples ?? [];
+      if (scrubAlongNm == null || samples.length < 2) {
+        if (scrubMarkerRef.current) {
+          scrubMarkerRef.current.remove();
+          scrubMarkerRef.current = null;
+        }
+        return;
+      }
+      const total = samples[samples.length - 1].alongTrackNm;
+      const target = Math.max(0, Math.min(total, scrubAlongNm));
+      let lo = 0;
+      let hi = samples.length - 1;
+      // Linear scan — samples are small enough (< a few hundred).
+      for (let i = 0; i < samples.length - 1; i++) {
+        if (samples[i].alongTrackNm <= target && samples[i + 1].alongTrackNm >= target) {
+          lo = i;
+          hi = i + 1;
+          break;
+        }
+      }
+      const a = samples[lo];
+      const b = samples[hi];
+      const span = b.alongTrackNm - a.alongTrackNm;
+      const t = span > 0 ? (target - a.alongTrackNm) / span : 0;
+      const lat = a.lat + (b.lat - a.lat) * t;
+      const lon = a.lon + (b.lon - a.lon) * t;
+
+      if (!scrubMarkerRef.current) {
+        const el = document.createElement('div');
+        el.className = 'kfp-scrub-cursor';
+        scrubMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lon, lat])
+          .addTo(map);
+      } else {
+        scrubMarkerRef.current.setLngLat([lon, lat]);
+      }
+    }, [scrubAlongNm, routeProfile]);
 
     // Reflect selected airport on the runway overlay layer.
     useEffect(() => {
