@@ -12,7 +12,6 @@ import {
 } from '../../weather/metar-format';
 import {
   computeDensityAltitude,
-  densityAltitudeChip,
   type DensityAltitudeResult,
 } from '../../math/density-altitude';
 
@@ -47,8 +46,10 @@ export function createAirportPill(Shared: SharedDependencies) {
           : `${metar.visibilitySm} sm`;
     const detail = [cig, vis].filter(Boolean).join(' · ') || '—';
 
+    // Density altitude lives in the popover only — the compact pill is
+    // reserved for glance info (category + ceiling + visibility) so it
+    // never overflows a narrow rail card.
     const da = computeDa(metar, fieldElevFt);
-    const daChip = da ? densityAltitudeChip(da) : null;
 
     return (
       <Popover>
@@ -71,6 +72,8 @@ export function createAirportPill(Shared: SharedDependencies) {
               fontFamily: 'inherit',
               whiteSpace: 'nowrap',
               maxWidth: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
             }}
             title={`${icao} · ${cat} · tap for details`}
           >
@@ -99,23 +102,26 @@ export function createAirportPill(Shared: SharedDependencies) {
               style={{
                 color: 'rgb(var(--kfp-fg))',
                 fontFamily: 'var(--kfp-font-mono)',
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               {detail}
             </span>
-            {daChip && (
+            {da && da.deviationFt >= 1500 && (
               <>
                 <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>·</span>
                 <span
+                  aria-label={`High density altitude, ${da.densityAltFt.toLocaleString()} feet`}
+                  title={`Density altitude ${da.densityAltFt.toLocaleString()} ft (${da.deviationFt >= 0 ? '+' : '−'}${Math.abs(da.deviationFt).toLocaleString()} vs field)`}
                   style={{
-                    color:
-                      da && da.deviationFt >= 1500
-                        ? 'rgb(var(--kfp-warn))'
-                        : 'rgb(var(--kfp-fg-muted))',
+                    color: 'rgb(var(--kfp-warn))',
                     fontFamily: 'var(--kfp-font-mono)',
+                    fontWeight: 600,
                   }}
                 >
-                  {daChip}
+                  ⚠ DA
                 </span>
               </>
             )}
