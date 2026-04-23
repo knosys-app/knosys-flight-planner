@@ -32,7 +32,7 @@ import { createMapViewer } from '../map/map-viewer';
 
 import { FlightShell } from './shell/flight-shell';
 import { createPlanPill } from './shell/plan-pill';
-import { createLayersButton } from './shell/layers-button';
+import { createLayersButton, resolveLayerVisibility } from './shell/layers-button';
 import { createPlanRail } from './rail/plan-rail';
 import { createBriefingCard } from './rail/briefing-card';
 import { createWindsOverrideDialog } from './rail/winds-override-dialog';
@@ -406,8 +406,19 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       if (sheetDetent === 'peek') setSheetDetent('half');
     };
 
+    const layerVisibility = resolveLayerVisibility(settings);
+
     return (
-      <FlightShell map={<MapViewer plan={plan} selectedAirport={selectedAirport} />}>
+      <FlightShell
+        map={
+          <MapViewer
+            plan={plan}
+            routeProfile={routeProfile}
+            selectedAirport={selectedAirport}
+            layerVisibility={layerVisibility}
+          />
+        }
+      >
         <PlanPill
           plan={plan}
           onRename={setPlanName}
