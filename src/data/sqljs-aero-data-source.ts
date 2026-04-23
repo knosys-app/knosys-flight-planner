@@ -395,9 +395,16 @@ export class SqlJsAeroDataSource implements AeroDataSource {
   }
 
   private loadRunways(db: Database, ident: string): Runway[] {
+    // le_latitude_deg/le_longitude_deg/he_latitude_deg/he_longitude_deg are
+    // airport-DB v2 columns. SELECT survives on v1 DBs only because sqljs
+    // errors on missing columns — so we probe the schema once and branch.
+    const hasEndpoints = this.runwayColumns().has('le_latitude_deg');
+    const cols = hasEndpoints
+      ? `le_ident, he_ident, length_ft, width_ft, surface, le_heading_degT,
+         le_latitude_deg, le_longitude_deg, he_latitude_deg, he_longitude_deg`
+      : `le_ident, he_ident, length_ft, width_ft, surface, le_heading_degT`;
     const stmt = db.prepare(
-      `SELECT le_ident, he_ident, length_ft, width_ft, surface, le_heading_degT
-       FROM runways WHERE airport_ident = :id`,
+      `SELECT ${cols} FROM runways WHERE airport_ident = :id`,
     );
     try {
       stmt.bind({ ':id': ident });
@@ -410,6 +417,10 @@ export class SqlJsAeroDataSource implements AeroDataSource {
           width_ft: number | null;
           surface: string | null;
           le_heading_degT: number | null;
+          le_latitude_deg?: number | null;
+          le_longitude_deg?: number | null;
+          he_latitude_deg?: number | null;
+          he_longitude_deg?: number | null;
         };
         out.push({
           id: `${r.le_ident ?? '?'}/${r.he_ident ?? '?'}`,
@@ -419,12 +430,36 @@ export class SqlJsAeroDataSource implements AeroDataSource {
           widthFt: r.width_ft ?? 0,
           surface: r.surface ?? 'unknown',
           headingTrue: r.le_heading_degT ?? 0,
+          leLat: r.le_latitude_deg ?? undefined,
+          leLon: r.le_longitude_deg ?? undefined,
+          heLat: r.he_latitude_deg ?? undefined,
+          heLon: r.he_longitude_deg ?? undefined,
         });
       }
       return out;
     } finally {
       stmt.free();
     }
+  }
+
+  private runwayColumnsCache: Set<string> | null = null;
+
+  /** PRAGMA-probe the runways table columns once per session. */
+  private runwayColumns(): Set<string> {
+    if (this.runwayColumnsCache) return this.runwayColumnsCache;
+    const db = this.requireDb();
+    const stmt = db.prepare(`PRAGMA table_info(runways)`);
+    const cols = new Set<string>();
+    try {
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as { name?: string };
+        if (row.name) cols.add(row.name);
+      }
+    } finally {
+      stmt.free();
+    }
+    this.runwayColumnsCache = cols;
+    return cols;
   }
 
   private loadFrequencies(db: Database, ident: string): Frequency[] {

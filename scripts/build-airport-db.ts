@@ -121,7 +121,11 @@ async function main(): Promise<void> {
       width_ft INTEGER,
       surface TEXT,
       le_heading_degT REAL,
-      he_heading_degT REAL
+      he_heading_degT REAL,
+      le_latitude_deg REAL,
+      le_longitude_deg REAL,
+      he_latitude_deg REAL,
+      he_longitude_deg REAL
     );
     CREATE INDEX runways_ident_idx ON runways(airport_ident);
 
@@ -155,8 +159,10 @@ async function main(): Promise<void> {
   const insertRunway = db.prepare(`
     INSERT INTO runways
       (airport_ident, le_ident, he_ident, length_ft, width_ft, surface,
-       le_heading_degT, he_heading_degT)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       le_heading_degT, he_heading_degT,
+       le_latitude_deg, le_longitude_deg,
+       he_latitude_deg, he_longitude_deg)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertNavaid = db.prepare(`
     INSERT INTO navaids
@@ -196,6 +202,10 @@ async function main(): Promise<void> {
         str(r.surface),
         num(r.le_heading_degT),
         num(r.he_heading_degT),
+        num(r.le_latitude_deg),
+        num(r.le_longitude_deg),
+        num(r.he_latitude_deg),
+        num(r.he_longitude_deg),
       );
     }
     const seenNavaids = new Set<string>();

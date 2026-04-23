@@ -164,6 +164,15 @@ export interface Runway {
   headingTrue: number;
   leIdent?: string;
   heIdent?: string;
+  /**
+   * True-position endpoints from OurAirports. Present in airport DB v2+.
+   * Absent on legacy DBs — in that case the place-card diagram falls back
+   * to a schematic parallel-runway spread.
+   */
+  leLat?: number;
+  leLon?: number;
+  heLat?: number;
+  heLon?: number;
 }
 
 export interface Frequency {

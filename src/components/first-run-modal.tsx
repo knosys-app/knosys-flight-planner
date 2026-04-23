@@ -9,6 +9,7 @@ import {
 } from '../data/first-run-download';
 import { resetAeroDataSource } from '../hooks/use-aero-data';
 import { getSettings, saveSettings } from '../store/settings-store';
+import { CURRENT_AIRPORTS_DB_VERSION } from '../constants';
 
 export function createFirstRunModal(Shared: SharedDependencies) {
   const {
@@ -66,7 +67,10 @@ export function createFirstRunModal(Shared: SharedDependencies) {
           setStatus({ kind: 'downloading', loaded: p.loaded, total: p.total }),
         );
         const installedAt = new Date().toISOString();
-        await saveSettings({ airportsDbInstalledAt: installedAt });
+        await saveSettings({
+          airportsDbInstalledAt: installedAt,
+          airportsDbVersion: CURRENT_AIRPORTS_DB_VERSION,
+        });
         resetAeroDataSource();
         const size = await getAirportsDbSize();
         setStatus({ kind: 'installed', sizeBytes: size ?? 0, installedAt });
