@@ -752,13 +752,8 @@ button.kfp-chip {
 
 .kfp-place-hero {
   position: relative;
-  /* The hero is a flex child of the SheetContent column; without
-   * flex-shrink: 0 + an explicit min-height, a tall body (lots of
-   * frequencies) collapses the hero below its intended height and
-   * runway-end labels clip at the bottom edge. */
-  flex: 0 0 300px;
-  min-height: 300px;
-  height: 300px;
+  flex: 0 0 220px;
+  height: 220px;
   overflow: hidden;
   background: linear-gradient(
     180deg,
@@ -767,12 +762,30 @@ button.kfp-chip {
   );
   border-bottom: 1px solid rgb(var(--kfp-hairline));
   display: grid;
-  place-items: stretch;
-  padding: 14px;
+  place-items: center;
+  padding: 10px;
+  cursor: zoom-in;
+  transition: background var(--kfp-dur-base) ease;
 }
-.kfp-place-hero > svg {
-  width: 100%;
-  height: 100%;
+/* Reveal the full diagram on hover OR when the user has clicked to pin
+ * it open. Lifting z-index keeps the overflowing content on top of the
+ * titlebar below. */
+.kfp-place-hero:hover,
+.kfp-place-hero[data-expanded='true'] {
+  overflow: visible;
+  z-index: 2;
+}
+.kfp-place-hero[data-expanded='true'] {
+  cursor: zoom-out;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--kfp-accent) / 0.18) 0%,
+    rgb(var(--kfp-surface-tint) / 0.55) 100%
+  );
+}
+.kfp-place-hero:focus-visible {
+  outline: 2px solid rgb(var(--kfp-accent));
+  outline-offset: -2px;
 }
 
 .kfp-place-titlebar {
