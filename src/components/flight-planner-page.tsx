@@ -424,6 +424,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             selectedAirport={selectedAirport}
             layerVisibility={layerVisibility}
             scrubAlongNm={scrubAlongNm}
+            sheetDetent={sheetDetent}
           />
         }
       >

@@ -39,7 +39,19 @@ export function createMapViewer(Shared: SharedDependencies) {
      * hides the cursor.
      */
     scrubAlongNm?: number | null;
-  }> = ({ plan, routeProfile, selectedAirport, layerVisibility, scrubAlongNm }) => {
+    /**
+     * Current detent of the bottom sheet — used to pad fitBounds so the
+     * route doesn't tuck behind the sheet when auto-fitting.
+     */
+    sheetDetent?: 'peek' | 'half' | 'full';
+  }> = ({
+    plan,
+    routeProfile,
+    selectedAirport,
+    layerVisibility,
+    scrubAlongNm,
+    sheetDetent,
+  }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MaplibreMap | null>(null);
     const routeLayerRef = useRef<RouteMapLayer>(new RouteMapLayer());
@@ -248,29 +260,55 @@ export function createMapViewer(Shared: SharedDependencies) {
       }
     }, [layerVisibility.airspace, layerVisibility.airports, layerVisibility.navaids]);
 
-    // Route + profile updates.
+    // Route layer + gradient updates (no auto-fit here — that would re-
+    // center the map every time the profile resamples).
     useEffect(() => {
       const map = mapRef.current;
       if (!map) return;
       routeLayerRef.current.setPlan(plan);
       routeLayerRef.current.setProfile(routeProfile ?? null);
-      const render = () => {
-        routeLayerRef.current.update(map);
-        if (plan && plan.waypoints.length > 1) {
-          const coords = plan.waypoints.map((w) => [w.lon, w.lat]) as [number, number][];
-          const bounds = coords.reduce(
-            (b, c) => b.extend(c as any),
-            new maplibregl.LngLatBounds(coords[0] as any, coords[0] as any),
-          );
-          map.fitBounds(bounds, { padding: 80, duration: 500, maxZoom: 9 });
-        }
-      };
-      if (map.isStyleLoaded()) {
-        render();
-      } else {
-        map.once('load', render);
-      }
+      const render = () => routeLayerRef.current.update(map);
+      if (map.isStyleLoaded()) render();
+      else map.once('load', render);
     }, [plan, routeProfile]);
+
+    // Fit bounds only when the waypoint list itself changes (identity or
+    // order). Scrubbing, toggling layers, or profile re-samples must not
+    // retrigger this or the map yanks around under the user's cursor.
+    const waypointsSig = plan?.waypoints.map((w) => w.id).join(',') ?? '';
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !plan || plan.waypoints.length < 2) return;
+      const coords = plan.waypoints.map((w) => [w.lon, w.lat]) as [number, number][];
+      const bounds = coords.reduce(
+        (b, c) => b.extend(c as any),
+        new maplibregl.LngLatBounds(coords[0] as any, coords[0] as any),
+      );
+      const fit = () => {
+        // Rail: 16 px offset + 340 px width + 16 px gap ≈ 372. Round down
+        // a touch so the route line isn't jammed against the rail edge.
+        const left = 360;
+        const right = 80;
+        const top = 96;
+        // Bottom padding reflects the sheet detent so the route doesn't
+        // disappear under the sheet when it's open.
+        const vh = window.innerHeight;
+        const bottom =
+          sheetDetent === 'full'
+            ? Math.round(vh * 0.9) + 12
+            : sheetDetent === 'half'
+              ? Math.round(vh * 0.45) + 12
+              : 56; // peek handle only
+        map.fitBounds(bounds, {
+          padding: { top, right, bottom, left },
+          duration: 500,
+          maxZoom: 9,
+        });
+      };
+      if (map.isStyleLoaded()) fit();
+      else map.once('load', fit);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [waypointsSig, sheetDetent]);
 
     // Pin-drop animation on waypoint append. Fires only when the plan
     // grew by one waypoint — not on removal, replacement, or first mount.
