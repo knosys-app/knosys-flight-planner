@@ -8,6 +8,8 @@ import type {
   Waypoint,
 } from '../types';
 import type { SelectedAirportStore } from '../hooks/use-selected-airport';
+import { getAeroDataSource } from '../hooks/use-aero-data';
+import { RunwayDiagram } from './place-card/runway-diagram';
 
 // Reuse the same ordering used by the navlog picker for grouping.
 const FREQ_GROUP_ORDER = [
@@ -45,7 +47,6 @@ function groupFrequencies(freqs: Frequency[]): Array<{ type: string; items: Freq
       map.delete(key);
     }
   }
-  // Whatever remains gets appended in insertion order
   for (const [key, items] of map) {
     ordered.push({ type: key, items });
   }
@@ -69,22 +70,50 @@ function surfaceLabel(raw: string): string {
   return raw || 'Unknown';
 }
 
+function longestRunway(airport: Airport): Runway | null {
+  let best: Runway | null = null;
+  for (const r of airport.runways) {
+    if (!r.lengthFt) continue;
+    if (!best || r.lengthFt > best.lengthFt) best = r;
+  }
+  return best;
+}
+
+function bboxAround(lat: number, lon: number, nm: number): [number, number, number, number] {
+  const latDeg = nm / 60;
+  const lonDeg = nm / (60 * Math.cos((lat * Math.PI) / 180));
+  return [lon - lonDeg, lat - latDeg, lon + lonDeg, lat + latDeg];
+}
+
+function distanceNm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 3440.065;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 export function createAirportDetailSheet(Shared: SharedDependencies) {
-  const {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-    Button,
-    Badge,
-    Separator,
-    ScrollArea,
-  } = Shared;
+  const { Sheet, SheetContent, useState, useEffect, lucideIcons } = Shared;
+  const { Plus, Navigation, Copy, Plane } = lucideIcons as Record<string, any>;
 
   const AirportDetailSheet: FC<{
     store: SelectedAirportStore;
-    onAddToRoute?: (waypoint: { kind: 'airport' | 'navaid'; ref: string; name: string; lat: number; lon: number }) => void;
+    onAddToRoute?: (waypoint: {
+      kind: 'airport' | 'navaid';
+      ref: string;
+      name: string;
+      lat: number;
+      lon: number;
+    }) => void;
   }> = ({ store, onAddToRoute }) => {
     const open = store.selected !== null;
     const close = () => store.clear();
@@ -114,7 +143,10 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
 
     const center = () => {
       if (!store.selected) return;
-      const p = store.selected.kind === 'airport' ? store.selected.airport : store.selected.navaid;
+      const p =
+        store.selected.kind === 'airport'
+          ? store.selected.airport
+          : store.selected.navaid;
       store.requestFlyTo(p.lon, p.lat, 10);
     };
 
@@ -122,206 +154,365 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
       <Sheet open={open} onOpenChange={(v: boolean) => !v && close()}>
         <SheetContent
           side="right"
-          className="flex flex-col p-0"
-          style={{ width: 420, maxWidth: 420 }}
+          className="kfp-scope kfp-place-card-shell"
+          style={{
+            width: 440,
+            maxWidth: 440,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
         >
           {store.selected?.kind === 'airport' ? (
-            <AirportView airport={store.selected.airport} Shared={Shared} />
+            <AirportPlaceCard
+              airport={store.selected.airport}
+              onAddToRoute={addCurrent}
+              onCenter={center}
+              onSelectIcao={async (icao) => {
+                try {
+                  const ds = getAeroDataSource();
+                  const full = await ds.findAirportByIcao(icao);
+                  if (full) store.setAirport(full);
+                } catch {
+                  /* ignore */
+                }
+              }}
+            />
           ) : store.selected?.kind === 'navaid' ? (
-            <NavaidView navaid={store.selected.navaid} Shared={Shared} />
+            <NavaidPlaceCard
+              navaid={store.selected.navaid}
+              onAddToRoute={addCurrent}
+              onCenter={center}
+            />
           ) : null}
-
-          {store.selected && (
-            <div className="border-t p-3 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={center}>
-                Center on map
-              </Button>
-              {onAddToRoute && (
-                <Button size="sm" className="flex-1" onClick={addCurrent}>
-                  Add to route
-                </Button>
-              )}
-            </div>
-          )}
         </SheetContent>
       </Sheet>
     );
   };
 
-  const AirportView: FC<{ airport: Airport; Shared: SharedDependencies }> = ({
-    airport,
-    Shared: S,
-  }) => {
-    const {
-      SheetHeader: SH,
-      SheetTitle: ST,
-      SheetDescription: SD,
-      Badge: B,
-      Separator: Sep,
-      ScrollArea: Scroll,
-    } = S;
-    const typeLabel = airport.type.replace(/_/g, ' ').replace(/airport/i, '').trim()
-      || 'airport';
+  // ------------------------------------------------------------------
 
+  const AirportPlaceCard: FC<{
+    airport: Airport;
+    onAddToRoute: () => void;
+    onCenter: () => void;
+    onSelectIcao: (icao: string) => void;
+  }> = ({ airport, onAddToRoute, onCenter, onSelectIcao }) => {
     const grouped = groupFrequencies(airport.frequencies ?? []);
+    const longest = longestRunway(airport);
+    const typeLabel = airport.type
+      .replace(/_/g, ' ')
+      .replace(/airport/i, '')
+      .trim() || 'airport';
+    const [copiedMhz, setCopiedMhz] = useState<number | null>(null);
+    const [nearby, setNearby] = useState<
+      Array<{ icao: string; name: string; distNm: number; type: string }>
+    >([]);
+
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const ds = getAeroDataSource();
+          const nearbyRaw = await ds.airportsInBboxLite(
+            bboxAround(airport.lat, airport.lon, 30),
+            { types: ['large_airport', 'medium_airport', 'small_airport'], limit: 40 },
+          );
+          const list = nearbyRaw
+            .filter((a) => a.icao !== airport.icao)
+            .map((a) => ({
+              icao: a.icao,
+              name: a.name,
+              type: a.type,
+              distNm: distanceNm(airport.lat, airport.lon, a.lat, a.lon),
+            }))
+            .sort((a, b) => a.distNm - b.distNm)
+            .slice(0, 6);
+          if (!cancelled) setNearby(list);
+        } catch {
+          if (!cancelled) setNearby([]);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [airport.icao]);
+
+    const copyFreq = async (mhz: number) => {
+      try {
+        await navigator.clipboard?.writeText(mhz.toFixed(3));
+        setCopiedMhz(mhz);
+        setTimeout(() => setCopiedMhz((m) => (m === mhz ? null : m)), 1200);
+      } catch {
+        /* clipboard unavailable */
+      }
+    };
 
     return (
       <>
-        <SH className="px-4 pt-4 pb-3">
-          <ST className="text-2xl font-semibold tracking-tight">
-            {airport.icao}{' '}
-            {airport.iata && (
-              <span className="text-sm text-muted-foreground font-normal">· {airport.iata}</span>
-            )}
-          </ST>
-          <SD className="text-sm">
-            {airport.name}
-            {airport.municipality ? ` · ${airport.municipality}` : ''}
-            {airport.country ? `, ${airport.country}` : ''}
-          </SD>
-          <div className="flex items-center gap-2 text-xs pt-1">
-            <B variant="secondary">{typeLabel}</B>
-            {Number.isFinite(airport.elevationFt) && (
-              <span className="text-muted-foreground">
-                Elev {airport.elevationFt} ft
-              </span>
-            )}
-            <span className="text-muted-foreground">
-              {airport.lat.toFixed(4)}, {airport.lon.toFixed(4)}
-            </span>
-          </div>
-        </SH>
+        <div className="kfp-place-hero">
+          <RunwayDiagram airport={airport} size={200} />
+        </div>
 
-        <Sep />
-
-        <Scroll className="flex-1 min-h-0">
-          <div className="p-4 space-y-5">
-            <section>
-              <h3 className="text-sm font-medium mb-2">
-                Runways ({airport.runways.length})
-              </h3>
-              {airport.runways.length === 0 ? (
-                <div className="text-xs text-muted-foreground">No runway data</div>
-              ) : (
-                <div className="border rounded overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="text-left px-2 py-1">ID</th>
-                        <th className="text-right px-2 py-1">Length</th>
-                        <th className="text-right px-2 py-1">Width</th>
-                        <th className="text-left px-2 py-1">Surface</th>
-                        <th className="text-right px-2 py-1">Hdg</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {airport.runways.map((r: Runway) => (
-                        <tr key={r.id} className="border-t">
-                          <td className="px-2 py-1 font-mono">
-                            {r.leIdent ?? r.id}
-                            {r.heIdent ? `/${r.heIdent}` : ''}
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            {r.lengthFt ? `${r.lengthFt.toLocaleString()} ft` : '—'}
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            {r.widthFt ? `${r.widthFt} ft` : '—'}
-                          </td>
-                          <td className="px-2 py-1">{surfaceLabel(r.surface)}</td>
-                          <td className="px-2 py-1 text-right">
-                            {formatHeading(r.headingTrue)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        <div className="kfp-place-titlebar">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <div className="kfp-place-icao">
+              {airport.icao}
+              {airport.iata && (
+                <span className="kfp-place-iata">{airport.iata}</span>
               )}
-            </section>
+            </div>
+            <div className="kfp-place-subtitle">{airport.name}</div>
+            <div className="kfp-place-meta">
+              {typeLabel}
+              {airport.municipality ? ` · ${airport.municipality}` : ''}
+              {airport.country ? `, ${airport.country}` : ''}
+            </div>
+          </div>
 
-            <section>
-              <h3 className="text-sm font-medium mb-2">
-                Frequencies ({airport.frequencies.length})
-              </h3>
-              {grouped.length === 0 ? (
-                <div className="text-xs text-muted-foreground">No frequency data</div>
-              ) : (
-                <div className="space-y-2">
-                  {grouped.map(({ type, items }) => (
-                    <div key={type}>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                        {type}
-                      </div>
-                      <div className="border rounded divide-y">
-                        {items.map((f, i) => (
-                          <div
-                            key={`${f.mhz}-${i}`}
-                            className="flex items-center justify-between px-2 py-1 text-xs"
-                          >
-                            <span className="font-mono">{f.mhz.toFixed(3)}</span>
-                            <span className="text-muted-foreground truncate ml-2">
+          <button
+            type="button"
+            className="kfp-place-add"
+            onClick={onAddToRoute}
+            title="Add this airport to the current route"
+          >
+            {Plus && <Plus className="w-4 h-4" />}
+            <span>Add</span>
+          </button>
+        </div>
+
+        <div className="kfp-place-stats">
+          <Stat label="Elev" value={`${airport.elevationFt.toLocaleString()} ft`} />
+          {longest && (
+            <Stat
+              label="Longest rwy"
+              value={`${longest.lengthFt.toLocaleString()} ft`}
+              sub={`${longest.leIdent ?? ''}${longest.heIdent ? `/${longest.heIdent}` : ''}`}
+            />
+          )}
+          <Stat
+            label="Position"
+            value={`${airport.lat.toFixed(3)}, ${airport.lon.toFixed(3)}`}
+            mono
+          />
+        </div>
+
+        <div className="kfp-place-body">
+          <section>
+            <SectionLabel>Runways</SectionLabel>
+            {airport.runways.length === 0 ? (
+              <div className="kfp-place-empty">No runway data</div>
+            ) : (
+              <div className="kfp-place-runways">
+                {airport.runways.map((r: Runway) => (
+                  <div key={r.id} className="kfp-place-runway-row">
+                    <span className="kfp-place-runway-id">
+                      {r.leIdent ?? r.id}
+                      {r.heIdent ? `/${r.heIdent}` : ''}
+                    </span>
+                    <span>
+                      {r.lengthFt ? `${r.lengthFt.toLocaleString()} ft` : '—'}
+                      {r.widthFt ? ` · ${r.widthFt} ft` : ''}
+                    </span>
+                    <span className="kfp-place-runway-surface">
+                      {surfaceLabel(r.surface)}
+                    </span>
+                    <span className="kfp-place-runway-hdg">
+                      {formatHeading(r.headingTrue)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <SectionLabel>Frequencies</SectionLabel>
+            {grouped.length === 0 ? (
+              <div className="kfp-place-empty">No frequency data</div>
+            ) : (
+              <div className="kfp-place-freqs">
+                {grouped.map(({ type, items }) => (
+                  <div key={type} className="kfp-place-freq-group">
+                    <div className="kfp-place-freq-type">{type}</div>
+                    <div className="kfp-place-freq-list">
+                      {items.map((f, i) => (
+                        <button
+                          key={`${f.mhz}-${i}`}
+                          type="button"
+                          className="kfp-place-freq-pill"
+                          onClick={() => copyFreq(f.mhz)}
+                          title={`${f.description || type} — click to copy`}
+                        >
+                          <span className="kfp-place-freq-mhz">
+                            {f.mhz.toFixed(3)}
+                          </span>
+                          {f.description && (
+                            <span className="kfp-place-freq-desc">
                               {f.description}
                             </span>
-                          </div>
-                        ))}
-                      </div>
+                          )}
+                          {copiedMhz === f.mhz ? (
+                            <span className="kfp-place-freq-copied">Copied</span>
+                          ) : (
+                            Copy && (
+                              <Copy
+                                className="w-3 h-3 kfp-place-freq-copy-icon"
+                                aria-hidden
+                              />
+                            )
+                          )}
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        </Scroll>
-      </>
-    );
-  };
-
-  const NavaidView: FC<{ navaid: Navaid; Shared: SharedDependencies }> = ({
-    navaid,
-    Shared: S,
-  }) => {
-    const {
-      SheetHeader: SH,
-      SheetTitle: ST,
-      SheetDescription: SD,
-      Badge: B,
-      Separator: Sep,
-    } = S;
-    return (
-      <>
-        <SH className="px-4 pt-4 pb-3">
-          <ST className="text-2xl font-semibold tracking-tight">{navaid.id}</ST>
-          <SD className="text-sm">{navaid.name}</SD>
-          <div className="flex items-center gap-2 text-xs pt-1">
-            <B variant="secondary">{navaid.type}</B>
-            {navaid.freq !== undefined && (
-              <span className="font-mono">{navaid.freq.toFixed(3)} MHz</span>
+                  </div>
+                ))}
+              </div>
             )}
-            <span className="text-muted-foreground">
-              {navaid.lat.toFixed(4)}, {navaid.lon.toFixed(4)}
-            </span>
-          </div>
-        </SH>
-        <Sep />
-        <div className="p-4 flex-1 min-h-0 text-sm text-muted-foreground">
-          Navaid route waypoint. The bundled database provides identifier, type,
-          coordinates, and frequency only — no additional metadata.
+          </section>
+
+          <section>
+            <SectionLabel>Nearby airports</SectionLabel>
+            {nearby.length === 0 ? (
+              <div className="kfp-place-empty">Nothing within 30 nm</div>
+            ) : (
+              <div className="kfp-place-nearby">
+                {nearby.map((n) => (
+                  <button
+                    key={n.icao}
+                    type="button"
+                    className="kfp-place-nearby-row"
+                    onClick={() => onSelectIcao(n.icao)}
+                  >
+                    {Plane && <Plane className="w-3.5 h-3.5" aria-hidden />}
+                    <span className="kfp-place-nearby-icao">{n.icao}</span>
+                    <span className="kfp-place-nearby-name">{n.name}</span>
+                    <span className="kfp-place-nearby-dist">
+                      {Math.round(n.distNm)} nm
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="kfp-place-actions">
+          <button
+            type="button"
+            className="kfp-place-action-secondary"
+            onClick={onCenter}
+          >
+            {Navigation && <Navigation className="w-4 h-4" />}
+            Center on map
+          </button>
         </div>
       </>
     );
   };
 
-  // Keep an unused reference so the tree-shaker doesn't drop the imports
-  // that are consumed inside factory-returned sub-components.
-  void SheetContent;
-  void SheetHeader;
-  void SheetTitle;
-  void SheetDescription;
-  void Separator;
-  void ScrollArea;
-  void Badge;
+  // ------------------------------------------------------------------
+
+  const NavaidPlaceCard: FC<{
+    navaid: Navaid;
+    onAddToRoute: () => void;
+    onCenter: () => void;
+  }> = ({ navaid, onAddToRoute, onCenter }) => {
+    const { lucideIcons: icons } = Shared;
+    const { Plus, Navigation } = icons as Record<string, any>;
+    return (
+      <>
+        <div className="kfp-place-hero" style={{ paddingTop: 24 }}>
+          <div
+            style={{
+              display: 'grid',
+              placeItems: 'center',
+              fontFamily: 'var(--kfp-font-display)',
+              fontWeight: 600,
+              fontSize: 42,
+              letterSpacing: '-0.02em',
+              color: 'rgb(var(--kfp-accent))',
+              height: 160,
+            }}
+          >
+            {navaid.type}
+          </div>
+        </div>
+
+        <div className="kfp-place-titlebar">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <div className="kfp-place-icao">{navaid.id}</div>
+            <div className="kfp-place-subtitle">{navaid.name}</div>
+            <div className="kfp-place-meta">Navaid</div>
+          </div>
+          <button
+            type="button"
+            className="kfp-place-add"
+            onClick={onAddToRoute}
+            title="Add this navaid to the current route"
+          >
+            {Plus && <Plus className="w-4 h-4" />}
+            <span>Add</span>
+          </button>
+        </div>
+
+        <div className="kfp-place-stats">
+          <Stat label="Type" value={navaid.type} />
+          {navaid.freq !== undefined && (
+            <Stat label="Frequency" value={`${navaid.freq.toFixed(3)} MHz`} mono />
+          )}
+          <Stat
+            label="Position"
+            value={`${navaid.lat.toFixed(3)}, ${navaid.lon.toFixed(3)}`}
+            mono
+          />
+        </div>
+
+        <div className="kfp-place-body">
+          <div className="kfp-place-empty" style={{ fontSize: 13, padding: 12 }}>
+            Navaid metadata is limited to identifier, type, frequency, and
+            coordinates. Add it to a route as a GPS waypoint; tune the radio
+            when you're there.
+          </div>
+        </div>
+
+        <div className="kfp-place-actions">
+          <button
+            type="button"
+            className="kfp-place-action-secondary"
+            onClick={onCenter}
+          >
+            {Navigation && <Navigation className="w-4 h-4" />}
+            Center on map
+          </button>
+        </div>
+      </>
+    );
+  };
 
   return AirportDetailSheet;
 }
+
+const Stat: FC<{
+  label: string;
+  value: string;
+  sub?: string;
+  mono?: boolean;
+}> = ({ label, value, sub, mono }) => (
+  <div className="kfp-place-stat">
+    <div className="kfp-place-stat-label">{label}</div>
+    <div
+      className="kfp-place-stat-value"
+      style={{ fontFamily: mono ? 'var(--kfp-font-mono)' : undefined }}
+    >
+      {value}
+    </div>
+    {sub && <div className="kfp-place-stat-sub">{sub}</div>}
+  </div>
+);
+
+const SectionLabel: FC<{ children: string }> = ({ children }) => (
+  <div className="kfp-place-section-label">{children}</div>
+);
 
 export type { Waypoint };
