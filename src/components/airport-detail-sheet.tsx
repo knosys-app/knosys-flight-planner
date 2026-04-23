@@ -161,6 +161,11 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
             padding: 0,
             display: 'flex',
             flexDirection: 'column',
+            // Force an opaque background — shadcn's default `bg-background`
+            // utility doesn't resolve against the plugin's token scope, so
+            // the sheet would otherwise show through to the map.
+            backgroundColor: 'rgb(var(--kfp-bg))',
+            color: 'rgb(var(--kfp-fg))',
           }}
         >
           {store.selected?.kind === 'airport' ? (

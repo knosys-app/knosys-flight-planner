@@ -742,7 +742,7 @@ button.kfp-chip {
 /* ========== Place card (airport + navaid detail sheet) ========== */
 
 .kfp-place-card-shell {
-  background: rgb(var(--kfp-surface));
+  background: rgb(var(--kfp-bg));
   color: rgb(var(--kfp-fg));
 }
 
@@ -829,7 +829,7 @@ button.kfp-chip {
 }
 .kfp-place-stat {
   padding: 10px 12px;
-  background: rgb(var(--kfp-surface));
+  background: rgb(var(--kfp-bg));
   display: flex;
   flex-direction: column;
   gap: 2px;
