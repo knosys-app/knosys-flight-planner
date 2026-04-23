@@ -161,7 +161,7 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
   // comfortably sit inside the SVG viewBox even for the longest-runway
   // field in view. Combined with SVG overflow: visible on render, labels
   // are guaranteed not to clip at any airport.
-  const viewHalf = Math.max(maxExtent * 1.28, 100);
+  const viewHalf = Math.max(maxExtent * 1.35, 100);
 
   const metersToSvg = (mx: number, my: number) => ({
     x: size / 2 + (mx / viewHalf) * (size / 2),
@@ -201,7 +201,7 @@ function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
     const ey = Math.abs(r.halfLenM * cosA) + Math.abs(r.halfWidthM * sinA);
     maxExtent = Math.max(maxExtent, Math.abs(cx) + ex, Math.abs(cy) + ey);
   }
-  const viewHalf = Math.max(maxExtent * 1.28, 100);
+  const viewHalf = Math.max(maxExtent * 1.35, 100);
 
   const metersToSvg = (mx: number, my: number) => ({
     x: size / 2 + (mx / viewHalf) * (size / 2),
