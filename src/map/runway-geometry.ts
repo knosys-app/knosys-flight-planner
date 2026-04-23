@@ -36,6 +36,12 @@ function destinationClean(from: LngLat, bearingDeg: number, distanceMeters: numb
  * representing the paved surface (length × width), oriented by the le
  * heading. Output is a ring of [lng, lat] pairs, closed.
  *
+ * When the runway carries true endpoint coordinates (airport DB v2+),
+ * the rectangle is built around those endpoints — so parallel runways
+ * at the same airport land in their real-world positions. Otherwise
+ * falls back to centering at the airport reference point, which
+ * collapses parallels onto the same axis.
+ *
  * Returns null if length or heading data is missing.
  */
 export function runwayPolygon(
@@ -46,19 +52,31 @@ export function runwayPolygon(
   const heading = runway.headingTrue;
   if (!Number.isFinite(heading)) return null;
 
-  const halfLenM = (runway.lengthFt / FT_PER_M) / 2;
   const halfWidM = Math.max(runway.widthFt || 0, 30) / FT_PER_M / 2;
   // Use max(widthFt, 30) so we always have some visible width; many small
   // runways have bogus width=0 in the source data.
-
-  const center: LngLat = { lng: airport.lon, lat: airport.lat };
-  const alongHdg = heading;
   const perpHdg = (heading + 90) % 360;
 
-  // Two axis points along the centerline
-  const tip = destinationClean(center, alongHdg, halfLenM);
-  const tail = destinationClean(center, alongHdg + 180, halfLenM);
-  // Offset each by half-width perpendicular to get the four corners
+  // Preferred path: use real endpoint coordinates if the DB provides them.
+  const hasEndpoints =
+    Number.isFinite(runway.leLat) &&
+    Number.isFinite(runway.leLon) &&
+    Number.isFinite(runway.heLat) &&
+    Number.isFinite(runway.heLon);
+
+  let tip: LngLat;
+  let tail: LngLat;
+  if (hasEndpoints) {
+    tail = { lat: runway.leLat!, lng: runway.leLon! };
+    tip = { lat: runway.heLat!, lng: runway.heLon! };
+  } else {
+    const halfLenM = (runway.lengthFt / FT_PER_M) / 2;
+    const center: LngLat = { lng: airport.lon, lat: airport.lat };
+    tip = destinationClean(center, heading, halfLenM);
+    tail = destinationClean(center, heading + 180, halfLenM);
+  }
+
+  // Offset each end perpendicular to the runway axis to get the four corners.
   const tipRight = destinationClean(tip, perpHdg, halfWidM);
   const tipLeft = destinationClean(tip, perpHdg + 180, halfWidM);
   const tailRight = destinationClean(tail, perpHdg, halfWidM);

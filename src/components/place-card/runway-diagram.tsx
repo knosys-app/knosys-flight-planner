@@ -4,15 +4,20 @@ import type { Airport, Runway } from '../../types';
 /**
  * Miniature airport runway diagram rendered at airport-local scale.
  *
- * Our airport DB stores per-runway length, width, and heading, but NOT
- * end-point coordinates — so "real" positions aren't available. Real
- * airports have parallel runways laterally offset from each other (KSEA's
- * 16L/16C/16R sit ~800 ft apart). Without coordinates we'd draw all three
- * on top of each other. The workaround here: detect near-parallel runways
- * (heading within ±5°), spread them perpendicular to their heading by a
- * fraction of the longest runway, and label each end. The result is a
- * layout diagram, not a chart — runway IDs and relative orientation read
- * correctly, but absolute positions are schematic.
+ * Two drawing modes:
+ *
+ * 1. **True-position** (airport DB v2+): each runway carries
+ *    `le{Lat,Lon}` + `he{Lat,Lon}`, so we project endpoints into
+ *    airport-local meters and draw the real layout. Parallel runways
+ *    end up where they actually are (KSEA's 16L/16C/16R properly
+ *    separated by ~800 ft).
+ *
+ * 2. **Schematic fallback** (legacy v1 DBs): only heading + length
+ *    are known, so all runways would collapse onto the airport
+ *    reference point. We detect near-parallel runways and spread
+ *    them laterally across ~22% of the longest runway length. Correct
+ *    relative orientation, schematic absolute positions. A footer
+ *    ("LAYOUT · NOT TO SCALE") flags the approximation.
  */
 
 const FT_PER_M = 3.28084;
@@ -32,35 +37,36 @@ export interface RunwayDiagramProps {
   size?: number;
 }
 
+interface DrawnRunway {
+  runway: Runway;
+  tip: { x: number; y: number };
+  tail: { x: number; y: number };
+  widthPx: number;
+}
+
 function angularDiff(a: number, b: number): number {
   let d = Math.abs(a - b) % 360;
   if (d > 180) d = 360 - d;
-  // Treat reciprocal headings as parallel (16/34 vs 34/16).
   return Math.min(d, 180 - d);
 }
 
-/** Assign lateral offsets within a set of near-parallel runways. */
 function spreadOffsets(groupSize: number, spreadM: number): number[] {
   if (groupSize === 1) return [0];
   const step = spreadM / Math.max(groupSize - 1, 1);
-  const half = (spreadM * (groupSize - 1)) / (2 * Math.max(groupSize - 1, 1));
   const out: number[] = [];
   for (let i = 0; i < groupSize; i++) {
-    out.push(i * step - half * (groupSize - 1) / Math.max(groupSize - 1, 1));
+    out.push(i * step - spreadM / 2);
   }
-  // The formula above reduces to: i * step - half*(n-1)/(n-1) = i*step - half.
-  // Simplify — but keep the guard against n==1.
   return out;
 }
 
-function layoutRunways(runways: Runway[]): LaidOutRunway[] {
+function layoutRunwaysSchematic(runways: Runway[]): LaidOutRunway[] {
   if (runways.length === 0) return [];
 
   const longestFt = runways.reduce((m, r) => Math.max(m, r.lengthFt || 0), 0);
   const longestM = longestFt / FT_PER_M;
-  const groupSpreadM = longestM * 0.22; // ~22% of the longest runway width-wise
+  const groupSpreadM = longestM * 0.22;
 
-  // Group near-parallel runways.
   const groups: Runway[][] = [];
   for (const r of runways) {
     const g = groups.find((grp) =>
@@ -74,8 +80,6 @@ function layoutRunways(runways: Runway[]): LaidOutRunway[] {
 
   const out: LaidOutRunway[] = [];
   for (const grp of groups) {
-    // Sort parallel runways by ident so L → C → R lands left-to-right
-    // relative to the shared heading (consistent reading).
     grp.sort((a, b) => (a.leIdent ?? '').localeCompare(b.leIdent ?? ''));
     const offsets = spreadOffsets(grp.length, groupSpreadM);
     grp.forEach((r, i) => {
@@ -90,6 +94,129 @@ function layoutRunways(runways: Runway[]): LaidOutRunway[] {
   }
 
   return out;
+}
+
+function hasTrueEndpoints(r: Runway): boolean {
+  return (
+    Number.isFinite(r.leLat) &&
+    Number.isFinite(r.leLon) &&
+    Number.isFinite(r.heLat) &&
+    Number.isFinite(r.heLon)
+  );
+}
+
+/**
+ * Project (lat, lon) onto airport-local metric plane. Equirectangular
+ * around the airport reference point is plenty accurate for runway-scale
+ * geometry; the scale distortion across even KDEN's 14,000 ft runway is
+ * under 1%.
+ */
+function latLonToLocalMeters(
+  lat: number,
+  lon: number,
+  refLat: number,
+  refLon: number,
+): { mx: number; my: number } {
+  const refLatRad = (refLat * Math.PI) / 180;
+  const mx = (lon - refLon) * 111320 * Math.cos(refLatRad);
+  const my = (lat - refLat) * 111320;
+  return { mx, my };
+}
+
+function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | null {
+  const runways = airport.runways.filter(
+    (r) => r.lengthFt && Number.isFinite(r.headingTrue) && hasTrueEndpoints(r),
+  );
+  if (runways.length === 0 || runways.length !== airport.runways.length) {
+    // Any runway missing endpoints → fall back entirely so we don't mix
+    // real + schematic in one diagram.
+    return null;
+  }
+
+  // First pass: collect endpoint pairs in local meters, find extent.
+  const endpoints = runways.map((r) => {
+    const le = latLonToLocalMeters(r.leLat!, r.leLon!, airport.lat, airport.lon);
+    const he = latLonToLocalMeters(r.heLat!, r.heLon!, airport.lat, airport.lon);
+    return { runway: r, le, he };
+  });
+
+  let maxExtent = 0;
+  for (const ep of endpoints) {
+    maxExtent = Math.max(
+      maxExtent,
+      Math.abs(ep.le.mx),
+      Math.abs(ep.le.my),
+      Math.abs(ep.he.mx),
+      Math.abs(ep.he.my),
+    );
+  }
+  const viewHalf = Math.max(maxExtent * 1.15, 100);
+
+  const metersToSvg = (mx: number, my: number) => ({
+    x: size / 2 + (mx / viewHalf) * (size / 2),
+    y: size / 2 - (my / viewHalf) * (size / 2),
+  });
+
+  return endpoints.map((ep) => {
+    const tip = metersToSvg(ep.he.mx, ep.he.my);
+    const tail = metersToSvg(ep.le.mx, ep.le.my);
+    const halfWidthM = Math.max(ep.runway.widthFt || 0, 40) / FT_PER_M / 2;
+    const widthPx = (halfWidthM / viewHalf) * (size / 2) * 2;
+    return {
+      runway: ep.runway,
+      tip,
+      tail,
+      widthPx: Math.max(widthPx, 3),
+    };
+  });
+}
+
+function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
+  const valid = airport.runways.filter(
+    (r) => r.lengthFt && Number.isFinite(r.headingTrue),
+  );
+  if (valid.length === 0) return [];
+
+  const laid = layoutRunwaysSchematic(valid);
+
+  let maxExtent = 0;
+  for (const r of laid) {
+    const rad = (r.angleDeg * Math.PI) / 180;
+    const cosA = Math.cos(rad);
+    const sinA = Math.sin(rad);
+    const cx = r.perpOffsetM * cosA;
+    const cy = r.perpOffsetM * -sinA;
+    const ex = Math.abs(r.halfLenM * sinA) + Math.abs(r.halfWidthM * cosA);
+    const ey = Math.abs(r.halfLenM * cosA) + Math.abs(r.halfWidthM * sinA);
+    maxExtent = Math.max(maxExtent, Math.abs(cx) + ex, Math.abs(cy) + ey);
+  }
+  const viewHalf = Math.max(maxExtent * 1.18, 100);
+
+  const metersToSvg = (mx: number, my: number) => ({
+    x: size / 2 + (mx / viewHalf) * (size / 2),
+    y: size / 2 - (my / viewHalf) * (size / 2),
+  });
+
+  return laid.map((r) => {
+    const rad = (r.angleDeg * Math.PI) / 180;
+    const cosA = Math.cos(rad);
+    const sinA = Math.sin(rad);
+    const axisX = sinA;
+    const axisY = cosA;
+    const perpX = cosA;
+    const perpY = -sinA;
+    const cx = r.perpOffsetM * perpX;
+    const cy = r.perpOffsetM * perpY;
+    const tip = metersToSvg(cx + axisX * r.halfLenM, cy + axisY * r.halfLenM);
+    const tail = metersToSvg(cx - axisX * r.halfLenM, cy - axisY * r.halfLenM);
+    const widthPx = (r.halfWidthM / viewHalf) * (size / 2) * 2;
+    return {
+      runway: r.runway,
+      tip,
+      tail,
+      widthPx: Math.max(widthPx, 3),
+    };
+  });
 }
 
 export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) => {
@@ -114,54 +241,9 @@ export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) =
     );
   }
 
-  const laid = layoutRunways(valid);
-
-  // Compute extents in local meters so the diagram fits inside viewBox.
-  let maxExtent = 0;
-  for (const r of laid) {
-    const rad = (r.angleDeg * Math.PI) / 180;
-    // Rotated rectangle corners (relative to its own center)
-    const cosA = Math.cos(rad);
-    const sinA = Math.sin(rad);
-    // Runway axis is along (sin, cos) in "screen-up is north" orientation.
-    // Center is offset perpendicular to the axis: (cos, -sin).
-    const cx = r.perpOffsetM * cosA;
-    const cy = r.perpOffsetM * -sinA;
-    const ex = Math.abs(r.halfLenM * sinA) + Math.abs(r.halfWidthM * cosA);
-    const ey = Math.abs(r.halfLenM * cosA) + Math.abs(r.halfWidthM * sinA);
-    maxExtent = Math.max(maxExtent, Math.abs(cx) + ex, Math.abs(cy) + ey);
-  }
-  const viewHalf = Math.max(maxExtent * 1.18, 100);
-
-  const metersToSvg = (mx: number, my: number) => {
-    const x = size / 2 + (mx / viewHalf) * (size / 2);
-    const y = size / 2 - (my / viewHalf) * (size / 2);
-    return { x, y };
-  };
-
-  // For each runway, compute centerline endpoints in SVG coords.
-  const drawn = laid.map((r) => {
-    const rad = (r.angleDeg * Math.PI) / 180;
-    const cosA = Math.cos(rad);
-    const sinA = Math.sin(rad);
-    // Axis direction: heading 0 (north) → (0, +1). So axis = (sin, cos).
-    const axisX = sinA;
-    const axisY = cosA;
-    // Perpendicular (right of runway heading) = (cos, -sin).
-    const perpX = cosA;
-    const perpY = -sinA;
-    const cx = r.perpOffsetM * perpX;
-    const cy = r.perpOffsetM * perpY;
-    const tip = metersToSvg(cx + axisX * r.halfLenM, cy + axisY * r.halfLenM);
-    const tail = metersToSvg(cx - axisX * r.halfLenM, cy - axisY * r.halfLenM);
-    const widthPx = (r.halfWidthM / viewHalf) * (size / 2) * 2;
-    return {
-      runway: r.runway,
-      tip,
-      tail,
-      widthPx: Math.max(widthPx, 3),
-    };
-  });
+  const realPositions = drawnFromEndpoints(airport, size);
+  const drawn = realPositions ?? drawnFromSchematic(airport, size);
+  const isSchematic = realPositions === null;
 
   return (
     <svg
@@ -253,28 +335,25 @@ export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) =
         </text>
       </g>
 
-      <text
-        x={size / 2}
-        y={size - 6}
-        textAnchor="middle"
-        style={{
-          fontFamily: 'var(--kfp-font-mono)',
-          fontSize: 7,
-          fill: 'rgb(var(--kfp-fg-muted))',
-          letterSpacing: '0.08em',
-        }}
-      >
-        LAYOUT · NOT TO SCALE
-      </text>
+      {isSchematic && (
+        <text
+          x={size / 2}
+          y={size - 6}
+          textAnchor="middle"
+          style={{
+            fontFamily: 'var(--kfp-font-mono)',
+            fontSize: 7,
+            fill: 'rgb(var(--kfp-fg-muted))',
+            letterSpacing: '0.08em',
+          }}
+        >
+          LAYOUT · NOT TO SCALE
+        </text>
+      )}
     </svg>
   );
 };
 
-/**
- * Runway-end label placed just outside the runway end, offset along the
- * runway's own axis so it reads cleanly without colliding with a parallel
- * neighbor.
- */
 const RunwayLabel: FC<{
   x: number;
   y: number;

@@ -69,6 +69,14 @@ export type ZoomPresetKey = keyof typeof ZOOM_PRESETS;
 export const AIRPORTS_DB_URL =
   'https://raw.githubusercontent.com/knosys-app/knosys-flight-planner/main/data/airports.sqlite';
 
+/**
+ * Expected airports.sqlite schema version. v2 adds per-runway endpoint
+ * coordinates (le_latitude_deg, le_longitude_deg, he_latitude_deg,
+ * he_longitude_deg). The setup card uses this to nudge existing users
+ * who installed a v1 DB toward a refresh.
+ */
+export const CURRENT_AIRPORTS_DB_VERSION = '2';
+
 // Obstacle database (FAA DOF-derived SQLite). Committed to the repo so the
 // raw.githubusercontent.com CDN can serve it with permissive CORS. Opt-in:
 // users must enable "Avoid obstacles" in settings to download this file.
