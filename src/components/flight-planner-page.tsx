@@ -16,7 +16,6 @@ import { createUseMetars } from '../hooks/use-metars';
 import { createUseTafs } from '../hooks/use-tafs';
 import { createUseAutoWinds } from '../hooks/use-auto-winds';
 import { createUseAlternates } from '../hooks/use-alternates';
-import { isAirportsDbInstalled } from '../data/first-run-download';
 import { getAeroDataSource } from '../hooks/use-aero-data';
 import { createSelectedAirportProvider } from '../hooks/use-selected-airport';
 
@@ -24,15 +23,15 @@ import { createAircraftPicker } from './aircraft-picker';
 import { createAircraftEditorDialog } from './aircraft-editor-dialog';
 import { createRouteBuilder } from './route-builder';
 import { createNavlog } from './navlog';
-import { createExportBar } from './export-bar';
 import { createPlansList } from './plans-list';
-import { createFirstRunModal } from './first-run-modal';
+import { createSetupCard } from './rail/setup-card';
 import { createAirportDetailSheet } from './airport-detail-sheet';
 import { createMapViewer } from '../map/map-viewer';
 
 import { FlightShell } from './shell/flight-shell';
 import { createPlanPill } from './shell/plan-pill';
 import { createLayersButton, resolveLayerVisibility } from './shell/layers-button';
+import { createShortcutsSheet } from './shell/shortcuts-sheet';
 import { createPlanRail } from './rail/plan-rail';
 import { createBriefingCard } from './rail/briefing-card';
 import { createWindsOverrideDialog } from './rail/winds-override-dialog';
@@ -62,6 +61,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
   const PlanPill = createPlanPill(Shared);
   const LayersButton = createLayersButton(Shared);
+  const ShortcutsSheet = createShortcutsSheet(Shared);
   const { PlanRail, RailSection } = createPlanRail(Shared);
   const BriefingCard = createBriefingCard(Shared);
   const WindsOverrideDialog = createWindsOverrideDialog(Shared);
@@ -76,9 +76,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const AircraftPicker = createAircraftPicker(Shared);
   const AircraftEditorDialog = createAircraftEditorDialog(Shared);
   const Navlog = createNavlog(Shared);
-  const ExportBar = createExportBar(Shared);
   const PlansList = createPlansList(Shared);
-  const FirstRunModal = createFirstRunModal(Shared);
+  const SetupCard = createSetupCard(Shared);
   const AirportDetailSheet = createAirportDetailSheet(Shared);
   const MapViewer = createMapViewer(Shared);
 
@@ -106,7 +105,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingAircraft, setEditingAircraft] = useState<AircraftProfile | null>(null);
-    const [firstRunOpen, setFirstRunOpen] = useState(false);
     const [windsOverrideOpen, setWindsOverrideOpen] = useState(false);
     const [hydratedRows, setHydratedRows] = useState<NavlogRow[]>([]);
     const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
@@ -158,13 +156,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [plan?.destinationIcao]);
-
-    useEffect(() => {
-      (async () => {
-        const dbInstalled = await isAirportsDbInstalled();
-        if (!dbInstalled) setFirstRunOpen(true);
-      })();
-    }, []);
 
     useEffect(() => {
       if (!loading && !plan && selectedAircraft) {
@@ -430,6 +421,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
       >
         <PlanPill
           plan={plan}
+          aircraft={selectedAircraft}
+          navlog={rowsForDisplay}
           onRename={setPlanName}
           onSave={() => void saveCurrentPlan()}
           onNew={newPlan}
@@ -479,6 +472,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             }}
           />
 
+          <SetupCard />
+
           <RailSection title="Route">
             <RouteBuilder
               plan={plan}
@@ -501,10 +496,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
 
           <RailSection title="Saved plans">
             <PlansList plans={plans} currentId={plan.id} onOpen={openPlan} />
-          </RailSection>
-
-          <RailSection title="Export" defaultOpen={false}>
-            <ExportBar plan={plan} aircraft={selectedAircraft} navlog={rowsForDisplay} />
           </RailSection>
         </PlanRail>
 
@@ -568,11 +559,6 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           }}
         />
 
-        <FirstRunModal
-          open={firstRunOpen}
-          onClose={() => setFirstRunOpen(false)}
-        />
-
         <WindsOverrideDialog
           open={windsOverrideOpen}
           onClose={() => setWindsOverrideOpen(false)}
@@ -581,6 +567,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
         />
 
         <AirportDetailSheet store={selectedAirport} onAddToRoute={appendWaypoint} />
+
+        <ShortcutsSheet />
       </FlightShell>
     );
   };
