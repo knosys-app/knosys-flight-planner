@@ -34,6 +34,13 @@ interface LaidOutRunway {
 
 export interface RunwayDiagramProps {
   airport: Airport;
+  /**
+   * Logical viewBox edge length. The rendered SVG uses 100% width/height
+   * of its container (.kfp-place-hero styles it), so this only affects
+   * internal scaling ratios (stroke widths, label offsets) — larger
+   * values give finer-grained geometry, smaller ones exaggerate widths.
+   * Defaults to 260.
+   */
   size?: number;
 }
 
@@ -150,7 +157,11 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
       Math.abs(ep.he.my),
     );
   }
-  const viewHalf = Math.max(maxExtent * 1.15, 100);
+  // 1.28 gives enough margin that a runway endpoint + its ~8 px label
+  // comfortably sit inside the SVG viewBox even for the longest-runway
+  // field in view. Combined with SVG overflow: visible on render, labels
+  // are guaranteed not to clip at any airport.
+  const viewHalf = Math.max(maxExtent * 1.28, 100);
 
   const metersToSvg = (mx: number, my: number) => ({
     x: size / 2 + (mx / viewHalf) * (size / 2),
@@ -190,7 +201,7 @@ function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
     const ey = Math.abs(r.halfLenM * cosA) + Math.abs(r.halfWidthM * sinA);
     maxExtent = Math.max(maxExtent, Math.abs(cx) + ex, Math.abs(cy) + ey);
   }
-  const viewHalf = Math.max(maxExtent * 1.18, 100);
+  const viewHalf = Math.max(maxExtent * 1.28, 100);
 
   const metersToSvg = (mx: number, my: number) => ({
     x: size / 2 + (mx / viewHalf) * (size / 2),
@@ -219,7 +230,7 @@ function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
   });
 }
 
-export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) => {
+export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 260 }) => {
   const valid = airport.runways.filter(
     (r) => r.lengthFt && Number.isFinite(r.headingTrue),
   );
@@ -249,8 +260,9 @@ export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) =
     <svg
       viewBox={`0 0 ${size} ${size}`}
       width="100%"
-      height={size}
-      style={{ display: 'block' }}
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', overflow: 'visible' }}
       aria-label={`${airport.icao} runway layout diagram`}
       role="img"
     >
