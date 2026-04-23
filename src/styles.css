@@ -739,6 +739,196 @@ button.kfp-chip {
   }
 }
 
+/* ========== Leg timeline (sheet default tab) ========== */
+
+.kfp-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 18px;
+  height: 100%;
+  min-height: 160px;
+}
+
+.kfp-timeline-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.kfp-timeline-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kfp-timeline-summary-head {
+  font-family: var(--kfp-font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--kfp-fg));
+}
+.kfp-timeline-summary-sub {
+  font-family: var(--kfp-font-mono);
+  font-size: 12px;
+  color: rgb(var(--kfp-fg-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+.kfp-timeline-strip {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  min-height: 72px;
+  padding: 8px 0;
+  touch-action: none;
+  cursor: col-resize;
+  outline: none;
+}
+.kfp-timeline-strip:focus-visible {
+  outline: 2px solid rgb(var(--kfp-accent));
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.kfp-timeline-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 40px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgb(var(--kfp-surface-tint) / 0.65);
+  border: 1px solid rgb(var(--kfp-hairline));
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.02);
+  transition: transform var(--kfp-dur-base) var(--kfp-spring-b),
+              border-color var(--kfp-dur-base) ease,
+              background var(--kfp-dur-base) ease;
+  overflow: hidden;
+  user-select: none;
+  pointer-events: none; /* strip handles scrub; chips are visual-only */
+}
+.kfp-timeline-chip[data-active='true'] {
+  border-color: rgb(var(--kfp-accent) / 0.65);
+  background: rgb(var(--kfp-accent) / 0.1);
+  transform: translateY(-1px);
+}
+.kfp-timeline-chip[data-tone='warn'] {
+  border-color: rgb(var(--kfp-warn) / 0.6);
+}
+.kfp-timeline-chip[data-tone='danger'] {
+  border-color: rgb(var(--kfp-danger) / 0.7);
+  background: rgb(var(--kfp-danger) / 0.06);
+}
+
+.kfp-timeline-chip-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.kfp-timeline-chip-index {
+  font-family: var(--kfp-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgb(var(--kfp-fg-muted));
+}
+.kfp-timeline-chip-ref {
+  font-family: var(--kfp-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--kfp-fg));
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.kfp-timeline-chip-arrow {
+  color: rgb(var(--kfp-fg-muted));
+  font-weight: 400;
+}
+.kfp-timeline-chip-bot {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-family: var(--kfp-font-mono);
+  font-size: 10.5px;
+  color: rgb(var(--kfp-fg-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+.kfp-timeline-cursor {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--kfp-accent) / 0.2) 0%,
+    rgb(var(--kfp-accent)) 25%,
+    rgb(var(--kfp-accent)) 75%,
+    rgb(var(--kfp-accent) / 0.2) 100%
+  );
+  box-shadow: 0 0 12px rgb(var(--kfp-accent) / 0.6);
+  pointer-events: none;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.kfp-timeline-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--kfp-font-mono);
+  font-size: 10px;
+  color: rgb(var(--kfp-fg-muted));
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: -4px;
+}
+
+/* ========== Map scrub cursor (outside .kfp-root) ==========
+ * Rendered by maplibregl.Marker when scrub is active. Soft pulse to read
+ * as "live indicator" rather than a fixed pin. */
+.kfp-scrub-cursor {
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+  position: relative;
+}
+.kfp-scrub-cursor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgb(10 132 255 / 0.28);
+  animation: kfp-scrub-pulse 1.6s ease-out infinite;
+}
+.kfp-scrub-cursor::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #0A84FF;
+  box-shadow: 0 0 0 2px #ffffff, 0 4px 12px rgb(10 132 255 / 0.5);
+}
+@keyframes kfp-scrub-pulse {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  70%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
 /* ========== Waypoint pin-drop (map marker, outside .kfp-root) ==========
  * Rendered by maplibregl.Marker in map-viewer.tsx on append. Lives outside
  * the plugin scope, so selectors don't carry the .kfp-root prefix. */

@@ -19,6 +19,12 @@ export interface ProfileRibbonProps {
   winds: WindsEntryRow[];
   departureElevFt: number;
   arrivalElevFt: number;
+  /**
+   * Shared along-track scrub position (nm). When set, overrides the local
+   * mouse-hover readout so timeline and map stay in sync with the profile.
+   */
+  scrubAlongNm?: number | null;
+  onScrubChange?: (along: number | null) => void;
 }
 
 interface RibbonRow {
@@ -68,6 +74,8 @@ export function createProfileRibbon(Shared: SharedDependencies) {
     winds,
     departureElevFt,
     arrivalElevFt,
+    scrubAlongNm,
+    onScrubChange,
   }) => {
     const [hover, setHover] = useState<RibbonRow | null>(null);
     const keyRef = useRef(0);
@@ -94,6 +102,24 @@ export function createProfileRibbon(Shared: SharedDependencies) {
       return keyRef.current;
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [plan?.id, samples.length]);
+
+    // Pick the sample nearest the external scrub position so the readout +
+    // cursor stay in sync with timeline/map while scrubbing from outside.
+    const scrubRow = useMemo<RibbonRow | null>(() => {
+      if (scrubAlongNm == null || data.length === 0) return null;
+      let best = data[0];
+      let bestDist = Math.abs(best.along - scrubAlongNm);
+      for (const r of data) {
+        const d = Math.abs(r.along - scrubAlongNm);
+        if (d < bestDist) {
+          best = r;
+          bestDist = d;
+        }
+      }
+      return best;
+    }, [data, scrubAlongNm]);
+
+    const effectiveReadout = scrubRow ?? hover;
 
     const yDomain = useMemo<[number, number]>(() => {
       if (data.length === 0) return [0, 10000];
@@ -144,9 +170,15 @@ export function createProfileRibbon(Shared: SharedDependencies) {
               margin={{ top: 20, right: 16, bottom: 8, left: 8 }}
               onMouseMove={(s: any) => {
                 const p = s?.activePayload?.[0]?.payload as RibbonRow | undefined;
-                if (p) setHover(p);
+                if (p) {
+                  setHover(p);
+                  onScrubChange?.(p.along);
+                }
               }}
-              onMouseLeave={() => setHover(null)}
+              onMouseLeave={() => {
+                setHover(null);
+                onScrubChange?.(null);
+              }}
             >
               <defs>
                 <linearGradient id={hypsoId} x1="0" y1="0" x2="0" y2="1">
@@ -221,6 +253,16 @@ export function createProfileRibbon(Shared: SharedDependencies) {
                 isAnimationActive={false}
               />
 
+              {scrubAlongNm != null && (
+                <ReferenceLine
+                  x={scrubAlongNm}
+                  stroke="rgb(var(--kfp-accent))"
+                  strokeOpacity={0.85}
+                  strokeWidth={1.5}
+                  ifOverflow="extendDomain"
+                />
+              )}
+
               {boundaries.map((b, i) => (
                 <ReferenceLine
                   key={`bnd-${i}`}
@@ -271,27 +313,27 @@ export function createProfileRibbon(Shared: SharedDependencies) {
         <div className="kfp-profile-readout">
           <span>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>At </span>
-            <b>{hover ? hover.along.toFixed(1) : (data[0]?.along ?? 0).toFixed(1)}</b>
+            <b>{effectiveReadout ? effectiveReadout.along.toFixed(1) : (data[0]?.along ?? 0).toFixed(1)}</b>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}> nm</span>
           </span>
           <span>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>Alt </span>
             <b>
-              {hover?.planned != null
-                ? hover.planned.toLocaleString()
+              {effectiveReadout?.planned != null
+                ? effectiveReadout.planned.toLocaleString()
                 : data[0]?.planned?.toLocaleString() ?? '—'}
             </b>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}> ft</span>
           </span>
           <span>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>Terrain </span>
-            <b>{hover ? hover.terrain.toLocaleString() : data[0].terrain.toLocaleString()}</b>
+            <b>{effectiveReadout ? effectiveReadout.terrain.toLocaleString() : data[0].terrain.toLocaleString()}</b>
             <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}> ft</span>
           </span>
-          {hover?.planned != null && (
+          {effectiveReadout?.planned != null && (
             <span>
               <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}>Clearance </span>
-              <b>{(hover.planned - hover.terrain).toLocaleString()}</b>
+              <b>{(effectiveReadout.planned - effectiveReadout.terrain).toLocaleString()}</b>
               <span style={{ color: 'rgb(var(--kfp-fg-muted))' }}> ft</span>
             </span>
           )}

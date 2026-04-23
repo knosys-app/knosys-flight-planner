@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { SharedDependencies } from '../../types';
 
 export type SheetDetent = 'peek' | 'half' | 'full';
-export type SheetTab = 'block' | 'navlog' | 'profile' | 'wb';
+export type SheetTab = 'timeline' | 'block' | 'navlog' | 'profile' | 'wb';
 
 export interface FlightSheetProps {
   detent: SheetDetent;
   onDetentChange: (d: SheetDetent) => void;
   tab: SheetTab;
   onTabChange: (t: SheetTab) => void;
+  timeline: ReactNode;
   block: ReactNode;
   navlog: ReactNode;
   profile: ReactNode;
@@ -64,6 +65,7 @@ export function createFlightSheet(_Shared: SharedDependencies) {
     onDetentChange,
     tab,
     onTabChange,
+    timeline,
     block,
     navlog,
     profile,
@@ -139,10 +141,11 @@ export function createFlightSheet(_Shared: SharedDependencies) {
     };
 
     const tabs: Array<{ id: SheetTab; label: string }> = [
-      { id: 'block', label: 'Block' },
-      { id: 'navlog', label: 'Navlog' },
+      { id: 'timeline', label: 'Timeline' },
       { id: 'profile', label: 'Profile' },
+      { id: 'block', label: 'Block' },
       { id: 'wb', label: 'W&B' },
+      { id: 'navlog', label: 'Navlog' },
     ];
 
     const sheetStyle =
@@ -192,6 +195,7 @@ export function createFlightSheet(_Shared: SharedDependencies) {
               ))}
             </div>
             <div className="kfp-sheet-body">
+              {tab === 'timeline' && timeline}
               {tab === 'block' && block}
               {tab === 'navlog' && navlog}
               {tab === 'profile' && profile}

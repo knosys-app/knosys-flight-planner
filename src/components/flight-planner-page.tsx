@@ -43,6 +43,7 @@ import {
 } from './sheet/flight-sheet';
 import { createBlockPanel } from './sheet/block-panel';
 import { createWBPanel } from './sheet/wb-panel';
+import { createLegTimeline } from './sheet/leg-timeline';
 import { createProfileRibbon } from './profile/profile-ribbon';
 import { createPluginErrorBoundary } from './plugin-error-boundary';
 
@@ -67,6 +68,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
   const FlightSheet = createFlightSheet(Shared);
   const BlockPanel = createBlockPanel(Shared);
   const WBPanel = createWBPanel(Shared);
+  const LegTimeline = createLegTimeline(Shared);
   const ProfileRibbon = createProfileRibbon(Shared);
 
   const PluginErrorBoundary = createPluginErrorBoundary(Shared);
@@ -110,7 +112,12 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
     const [airportElevations, setAirportElevations] = useState<Record<string, number>>({});
     const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
     const [sheetDetent, setSheetDetent] = useState<SheetDetent>('peek');
-    const [sheetTab, setSheetTab] = useState<SheetTab>('profile');
+    const [sheetTab, setSheetTab] = useState<SheetTab>('timeline');
+    /**
+     * Along-track scrub position (nm from first waypoint) shared across
+     * timeline, profile ribbon, and map cursor. `null` means "not scrubbing".
+     */
+    const [scrubAlongNm, setScrubAlongNm] = useState<number | null>(null);
     const lastAppliedAutoAltsRef = useRef<string>('');
 
     const alternatesResult = useAlternates(destinationAirport);
@@ -416,6 +423,7 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
             routeProfile={routeProfile}
             selectedAirport={selectedAirport}
             layerVisibility={layerVisibility}
+            scrubAlongNm={scrubAlongNm}
           />
         }
       >
@@ -504,6 +512,15 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
           onDetentChange={setSheetDetent}
           tab={sheetTab}
           onTabChange={setSheetTab}
+          timeline={
+            <LegTimeline
+              plan={plan}
+              rows={rowsForDisplay}
+              winds={effectiveWinds}
+              scrubAlongNm={scrubAlongNm}
+              onScrubChange={setScrubAlongNm}
+            />
+          }
           block={
             <BlockPanel
               totals={navlog.blockTotals}
@@ -532,6 +549,8 @@ export function createFlightPlannerPage(Shared: SharedDependencies) {
               winds={effectiveWinds}
               departureElevFt={depElev}
               arrivalElevFt={arrElev}
+              scrubAlongNm={scrubAlongNm}
+              onScrubChange={setScrubAlongNm}
             />
           }
           wb={<WBPanel aircraft={selectedAircraft} totals={navlog.blockTotals} />}
