@@ -197,6 +197,42 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
 
   // ------------------------------------------------------------------
 
+  /**
+   * Clickable hero wrapper around the runway diagram.
+   *
+   * Default: `.kfp-place-hero` clips the diagram via overflow: hidden so the
+   * hero stays a compact 220 px. Hover reveals the full diagram (CSS
+   * `:hover` removes overflow). Click pins it open — `data-expanded='true'`
+   * holds the un-clipped state until the next click.
+   */
+  const RunwayHero: FC<{ airport: Airport }> = ({ airport }) => {
+    const [expanded, setExpanded] = useState(false);
+    const toggle = () => setExpanded((v) => !v);
+    return (
+      <div
+        className="kfp-place-hero"
+        role="button"
+        tabIndex={0}
+        aria-pressed={expanded}
+        aria-label={
+          expanded
+            ? 'Collapse runway diagram'
+            : 'Expand runway diagram (click or hover)'
+        }
+        data-expanded={expanded ? 'true' : 'false'}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+      >
+        <RunwayDiagram airport={airport} size={200} />
+      </div>
+    );
+  };
+
   const AirportPlaceCard: FC<{
     airport: Airport;
     onAddToRoute: () => void;
@@ -255,9 +291,7 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
 
     return (
       <>
-        <div className="kfp-place-hero">
-          <RunwayDiagram airport={airport} size={200} />
-        </div>
+        <RunwayHero airport={airport} />
 
         <div className="kfp-place-titlebar">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
