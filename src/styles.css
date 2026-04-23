@@ -748,6 +748,12 @@ button.kfp-chip {
 
 .kfp-place-hero {
   position: relative;
+  /* The hero is a flex child of the SheetContent column; without
+   * flex-shrink: 0 + an explicit min-height, a tall body (lots of
+   * frequencies) collapses the hero below its intended height and
+   * runway-end labels clip at the bottom edge. */
+  flex: 0 0 300px;
+  min-height: 300px;
   height: 300px;
   overflow: hidden;
   background: linear-gradient(
