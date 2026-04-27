@@ -1,6 +1,6 @@
 {
   "name": "knosys-flight-planner",
-  "version": "0.9.0.4",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "scripts": {

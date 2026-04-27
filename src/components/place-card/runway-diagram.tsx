@@ -32,6 +32,15 @@ interface LaidOutRunway {
   angleDeg: number;
 }
 
+export interface OsmDiagramOverlay {
+  /** Each taxiway is a polyline in [lon, lat] pairs. */
+  taxiways: Array<Array<[number, number]>>;
+  /** Each apron is a polyline (closed or unclosed) in [lon, lat] pairs. */
+  aprons: Array<Array<[number, number]>>;
+  /** Each helipad is a single ring in [lon, lat] pairs. */
+  helipads: Array<Array<[number, number]>>;
+}
+
 export interface RunwayDiagramProps {
   airport: Airport;
   /**
@@ -41,6 +50,13 @@ export interface RunwayDiagramProps {
    * titlebar below so obscured ends become visible.
    */
   size?: number;
+  /**
+   * When the OSM source is active, the OSM aero data adapter passes the
+   * taxiway / apron / helipad geometry it parsed. The diagram renders
+   * these as thin gray lines and faint fills behind the runway stripes,
+   * giving the OSM tab a visible advantage over OurAirports.
+   */
+  osmOverlay?: OsmDiagramOverlay | null;
 }
 
 interface DrawnRunway {
@@ -129,7 +145,18 @@ function latLonToLocalMeters(
   return { mx, my };
 }
 
-function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | null {
+interface DrawnEndpointResult {
+  runways: DrawnRunway[];
+  /** Polylines in SVG coords for OSM overlay rendering. */
+  taxiwayPolylines: Array<Array<{ x: number; y: number }>>;
+  apronPolylines: Array<Array<{ x: number; y: number }>>;
+}
+
+function drawnFromEndpoints(
+  airport: Airport,
+  size: number,
+  overlay: OsmDiagramOverlay | null | undefined,
+): DrawnEndpointResult | null {
   const runways = airport.runways.filter(
     (r) => r.lengthFt && Number.isFinite(r.headingTrue) && hasTrueEndpoints(r),
   );
@@ -139,12 +166,29 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
     return null;
   }
 
-  // First pass: collect endpoint pairs in local meters, find extent.
+  // First pass: collect endpoint pairs + overlay vertices in local meters,
+  // find the union extent. Overlay polylines must share the same
+  // projection so taxiways align with runways.
   const endpoints = runways.map((r) => {
     const le = latLonToLocalMeters(r.leLat!, r.leLon!, airport.lat, airport.lon);
     const he = latLonToLocalMeters(r.heLat!, r.heLon!, airport.lat, airport.lon);
     return { runway: r, le, he };
   });
+
+  const overlayProjected = overlay
+    ? {
+        taxiways: overlay.taxiways.map((line) =>
+          line.map(([lon, lat]) =>
+            latLonToLocalMeters(lat, lon, airport.lat, airport.lon),
+          ),
+        ),
+        aprons: overlay.aprons.map((line) =>
+          line.map(([lon, lat]) =>
+            latLonToLocalMeters(lat, lon, airport.lat, airport.lon),
+          ),
+        ),
+      }
+    : null;
 
   let maxExtent = 0;
   for (const ep of endpoints) {
@@ -156,6 +200,13 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
       Math.abs(ep.he.my),
     );
   }
+  if (overlayProjected) {
+    for (const line of [...overlayProjected.taxiways, ...overlayProjected.aprons]) {
+      for (const p of line) {
+        maxExtent = Math.max(maxExtent, Math.abs(p.mx), Math.abs(p.my));
+      }
+    }
+  }
   const viewHalf = Math.max(maxExtent * 1.15, 100);
 
   const metersToSvg = (mx: number, my: number) => ({
@@ -163,7 +214,7 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
     y: size / 2 - (my / viewHalf) * (size / 2),
   });
 
-  return endpoints.map((ep) => {
+  const drawnRunways = endpoints.map((ep) => {
     const tip = metersToSvg(ep.he.mx, ep.he.my);
     const tail = metersToSvg(ep.le.mx, ep.le.my);
     const halfWidthM = Math.max(ep.runway.widthFt || 0, 40) / FT_PER_M / 2;
@@ -175,6 +226,19 @@ function drawnFromEndpoints(airport: Airport, size: number): DrawnRunway[] | nul
       widthPx: Math.max(widthPx, 3),
     };
   });
+
+  const taxiwayPolylines = overlayProjected
+    ? overlayProjected.taxiways.map((line) =>
+        line.map((p) => metersToSvg(p.mx, p.my)),
+      )
+    : [];
+  const apronPolylines = overlayProjected
+    ? overlayProjected.aprons.map((line) =>
+        line.map((p) => metersToSvg(p.mx, p.my)),
+      )
+    : [];
+
+  return { runways: drawnRunways, taxiwayPolylines, apronPolylines };
 }
 
 function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
@@ -225,7 +289,11 @@ function drawnFromSchematic(airport: Airport, size: number): DrawnRunway[] {
   });
 }
 
-export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) => {
+export const RunwayDiagram: FC<RunwayDiagramProps> = ({
+  airport,
+  size = 200,
+  osmOverlay,
+}) => {
   const valid = airport.runways.filter(
     (r) => r.lengthFt && Number.isFinite(r.headingTrue),
   );
@@ -247,9 +315,11 @@ export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) =
     );
   }
 
-  const realPositions = drawnFromEndpoints(airport, size);
-  const drawn = realPositions ?? drawnFromSchematic(airport, size);
+  const realPositions = drawnFromEndpoints(airport, size, osmOverlay ?? null);
+  const drawn = realPositions?.runways ?? drawnFromSchematic(airport, size);
   const isSchematic = realPositions === null;
+  const taxiwayPolylines = realPositions?.taxiwayPolylines ?? [];
+  const apronPolylines = realPositions?.apronPolylines ?? [];
 
   return (
     <svg
@@ -268,6 +338,37 @@ export const RunwayDiagram: FC<RunwayDiagramProps> = ({ airport, size = 200 }) =
       </defs>
 
       <rect x="0" y="0" width={size} height={size} fill={`url(#rwy-bg-${airport.icao})`} />
+
+      {/* OSM overlay: aprons fill faintly, taxiways draw as thin lines.
+       * Painted before runways so the runway stripes always sit on top. */}
+      {apronPolylines.length > 0 && (
+        <g aria-hidden>
+          {apronPolylines.map((line, i) => (
+            <polyline
+              key={`apron-${i}`}
+              points={line.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="rgb(var(--kfp-fg) / 0.06)"
+              stroke="rgb(var(--kfp-fg) / 0.18)"
+              strokeWidth={0.6}
+            />
+          ))}
+        </g>
+      )}
+      {taxiwayPolylines.length > 0 && (
+        <g aria-hidden>
+          {taxiwayPolylines.map((line, i) => (
+            <polyline
+              key={`tw-${i}`}
+              points={line.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="rgb(var(--kfp-fg) / 0.4)"
+              strokeWidth={1.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+        </g>
+      )}
 
       {/* Airport reference point */}
       <circle

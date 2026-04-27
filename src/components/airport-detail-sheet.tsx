@@ -9,7 +9,15 @@ import type {
 } from '../types';
 import type { SelectedAirportStore } from '../hooks/use-selected-airport';
 import { getAeroDataSource } from '../hooks/use-aero-data';
+import {
+  getMultiSourceAeroData,
+  type AeroSourceId,
+} from '../data/multi-source-aero-data';
+import { getOsmDetail } from '../data/osm-aero-data-source';
 import { RunwayDiagram } from './place-card/runway-diagram';
+import type { OsmDiagramOverlay } from './place-card/runway-diagram';
+import { createSourceTabs, type SourceTabState } from './place-card/source-tabs';
+import { AttributionFooter } from './place-card/attribution-footer';
 
 // Reuse the same ordering used by the navlog picker for grouping.
 const FREQ_GROUP_ORDER = [
@@ -85,6 +93,17 @@ function bboxAround(lat: number, lon: number, nm: number): [number, number, numb
   return [lon - lonDeg, lat - latDeg, lon + lonDeg, lat + latDeg];
 }
 
+function toOverlay(
+  detail: ReturnType<typeof getOsmDetail>,
+): OsmDiagramOverlay | null {
+  if (!detail) return null;
+  return {
+    taxiways: detail.taxiways.map((t) => t.geometry),
+    aprons: detail.aprons.map((a) => a.geometry),
+    helipads: detail.helipads.map((h) => h.geometry),
+  };
+}
+
 function distanceNm(
   lat1: number,
   lon1: number,
@@ -102,8 +121,9 @@ function distanceNm(
 }
 
 export function createAirportDetailSheet(Shared: SharedDependencies) {
-  const { Sheet, SheetContent, useState, useEffect, lucideIcons } = Shared;
+  const { Sheet, SheetContent, useState, useEffect, useMemo, lucideIcons } = Shared;
   const { Plus, Navigation, Copy, Plane } = lucideIcons as Record<string, any>;
+  const SourceTabs = createSourceTabs(Shared);
 
   const AirportDetailSheet: FC<{
     store: SelectedAirportStore;
@@ -169,8 +189,9 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
           }}
         >
           {store.selected?.kind === 'airport' ? (
-            <AirportPlaceCard
-              airport={store.selected.airport}
+            <AirportSourceShell
+              icao={store.selected.airport.icao}
+              fallback={store.selected.airport}
               onAddToRoute={addCurrent}
               onCenter={center}
               onSelectIcao={async (icao) => {
@@ -205,7 +226,10 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
    * `:hover` removes overflow). Click pins it open — `data-expanded='true'`
    * holds the un-clipped state until the next click.
    */
-  const RunwayHero: FC<{ airport: Airport }> = ({ airport }) => {
+  const RunwayHero: FC<{
+    airport: Airport;
+    overlay: OsmDiagramOverlay | null;
+  }> = ({ airport, overlay }) => {
     const [expanded, setExpanded] = useState(false);
     const toggle = () => setExpanded((v) => !v);
     return (
@@ -228,17 +252,204 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
           }
         }}
       >
-        <RunwayDiagram airport={airport} size={200} />
+        <RunwayDiagram airport={airport} size={200} osmOverlay={overlay} />
+      </div>
+    );
+  };
+
+  /**
+   * Per-source loading state. The shell holds one entry per source id.
+   * `pending` lets tabs show a subtle indicator; `null` means the source
+   * has been queried and returned no record.
+   */
+  type SourceLoad =
+    | { state: 'pending' }
+    | { state: 'ok'; airport: Airport; overlay: OsmDiagramOverlay | null }
+    | { state: 'empty' }
+    | { state: 'error'; message: string };
+
+  /**
+   * Multiplexer wrapping AirportPlaceCard. Owns the active source id +
+   * per-source resolution, renders the SourceTabs strip above and the
+   * AttributionFooter below. The card body stays unchanged; only the
+   * Airport it receives switches per tab.
+   */
+  const AirportSourceShell: FC<{
+    icao: string;
+    /** Initial airport from the user's click — always OurAirports. */
+    fallback: Airport;
+    onAddToRoute: () => void;
+    onCenter: () => void;
+    onSelectIcao: (icao: string) => void;
+  }> = ({ icao, fallback, onAddToRoute, onCenter, onSelectIcao }) => {
+    const facade = getMultiSourceAeroData();
+    const ids = facade.orderedIds();
+    const [active, setActive] = useState<AeroSourceId>('ourairports');
+    const [loads, setLoads] = useState<Record<AeroSourceId, SourceLoad>>({
+      ourairports: {
+        state: 'ok',
+        airport: fallback,
+        overlay: null,
+      },
+      osm: { state: 'pending' },
+      aixm: { state: 'empty' },
+      openaip: { state: 'empty' },
+    });
+
+    // Re-seed when the user clicks a different airport.
+    useEffect(() => {
+      setActive('ourairports');
+      setLoads({
+        ourairports: { state: 'ok', airport: fallback, overlay: null },
+        osm: { state: 'pending' },
+        aixm: { state: 'empty' },
+        openaip: { state: 'empty' },
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [icao]);
+
+    // Lazy-load a source on first activation. Skip OurAirports (already
+    // loaded from `fallback`) and unconfigured sources.
+    useEffect(() => {
+      const current = loads[active];
+      if (current.state !== 'pending') return;
+      const meta = facade.getMeta(active);
+      if (!meta.configured) {
+        setLoads((s) => ({ ...s, [active]: { state: 'empty' } }));
+        return;
+      }
+      const ds = facade.getSource(active);
+      if (!ds) {
+        setLoads((s) => ({ ...s, [active]: { state: 'empty' } }));
+        return;
+      }
+      let cancelled = false;
+      (async () => {
+        try {
+          const a = await ds.findAirportByIcao(icao);
+          if (cancelled) return;
+          if (!a) {
+            setLoads((s) => ({ ...s, [active]: { state: 'empty' } }));
+            return;
+          }
+          const overlay =
+            active === 'osm'
+              ? toOverlay(getOsmDetail(a))
+              : null;
+          setLoads((s) => ({
+            ...s,
+            [active]: { state: 'ok', airport: a, overlay },
+          }));
+        } catch (err) {
+          if (cancelled) return;
+          setLoads((s) => ({
+            ...s,
+            [active]: { state: 'error', message: String((err as Error).message) },
+          }));
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [active, icao, loads, facade]);
+
+    const tabStates = useMemo(() => {
+      const out: Record<AeroSourceId, SourceTabState> = {
+        ourairports: 'available',
+        osm: 'available',
+        aixm: 'available',
+        openaip: 'available',
+      };
+      for (const id of ids) {
+        const meta = facade.getMeta(id);
+        const load = loads[id];
+        if (id === active) {
+          out[id] = 'active';
+        } else if (!meta.configured) {
+          out[id] = 'unconfigured';
+        } else if (load.state === 'empty' || load.state === 'error') {
+          out[id] = 'no-data';
+        }
+      }
+      return out;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active, loads]);
+
+    const current = loads[active];
+
+    return (
+      <>
+        <SourceTabs active={active} states={tabStates} onSelect={setActive} />
+        {current.state === 'pending' && (
+          <SourceLoadingState label={facade.getMeta(active).label} />
+        )}
+        {(current.state === 'empty' || current.state === 'error') && (
+          <SourceEmptyState
+            sourceLabel={facade.getMeta(active).label}
+            icao={icao}
+            errorMessage={current.state === 'error' ? current.message : null}
+            onSwitchTo={(id) => setActive(id)}
+            otherIds={ids.filter((id) => id !== active)}
+          />
+        )}
+        {current.state === 'ok' && (
+          <AirportPlaceCard
+            airport={current.airport}
+            overlay={current.overlay}
+            onAddToRoute={onAddToRoute}
+            onCenter={onCenter}
+            onSelectIcao={onSelectIcao}
+          />
+        )}
+        <AttributionFooter source={active} />
+      </>
+    );
+  };
+
+  const SourceLoadingState: FC<{ label: string }> = ({ label }) => (
+    <div className="kfp-place-source-state">Looking up {label}…</div>
+  );
+
+  const SourceEmptyState: FC<{
+    sourceLabel: string;
+    icao: string;
+    errorMessage: string | null;
+    otherIds: AeroSourceId[];
+    onSwitchTo: (id: AeroSourceId) => void;
+  }> = ({ sourceLabel, icao, errorMessage, otherIds, onSwitchTo }) => {
+    const facade = getMultiSourceAeroData();
+    const fallbackId =
+      otherIds.find((id) => facade.getMeta(id).configured) ?? otherIds[0];
+    return (
+      <div className="kfp-place-source-state">
+        <div className="kfp-place-source-state-head">
+          {errorMessage
+            ? `${sourceLabel} couldn't load this airport.`
+            : `${sourceLabel} has no record of ${icao}.`}
+        </div>
+        {errorMessage && (
+          <div className="kfp-place-source-state-detail">{errorMessage}</div>
+        )}
+        {fallbackId && (
+          <button
+            type="button"
+            className="kfp-place-source-state-cta"
+            onClick={() => onSwitchTo(fallbackId)}
+          >
+            Try {facade.getMeta(fallbackId).label}
+          </button>
+        )}
       </div>
     );
   };
 
   const AirportPlaceCard: FC<{
     airport: Airport;
+    overlay: OsmDiagramOverlay | null;
     onAddToRoute: () => void;
     onCenter: () => void;
     onSelectIcao: (icao: string) => void;
-  }> = ({ airport, onAddToRoute, onCenter, onSelectIcao }) => {
+  }> = ({ airport, overlay, onAddToRoute, onCenter, onSelectIcao }) => {
     const grouped = groupFrequencies(airport.frequencies ?? []);
     const longest = longestRunway(airport);
     const typeLabel = airport.type
@@ -291,7 +502,7 @@ export function createAirportDetailSheet(Shared: SharedDependencies) {
 
     return (
       <>
-        <RunwayHero airport={airport} />
+        <RunwayHero airport={airport} overlay={overlay} />
 
         <div className="kfp-place-titlebar">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
