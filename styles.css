@@ -743,6 +743,92 @@ button.kfp-chip {
   }
 }
 
+/* ========== Place-card source tabs / attribution / source states ========== */
+
+.kfp-source-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgb(var(--kfp-hairline));
+  background: rgb(var(--kfp-bg));
+}
+.kfp-source-tab {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--kfp-fg-muted));
+  font-family: var(--kfp-font-display);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--kfp-dur-base) ease, color var(--kfp-dur-base) ease;
+}
+.kfp-source-tab:hover:not(:disabled) {
+  background: rgb(var(--kfp-fg) / 0.06);
+  color: rgb(var(--kfp-fg));
+}
+.kfp-source-tab[data-active='true'] {
+  background: rgb(var(--kfp-accent) / 0.14);
+  color: rgb(var(--kfp-accent));
+  font-weight: 600;
+}
+.kfp-source-tab[data-state='no-data'] {
+  color: rgb(var(--kfp-fg-muted));
+  opacity: 0.55;
+}
+.kfp-source-tab[data-state='unconfigured']:disabled {
+  color: rgb(var(--kfp-fg-muted));
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kfp-place-source-state {
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  font-family: var(--kfp-font-text);
+  color: rgb(var(--kfp-fg-muted));
+  font-size: 13px;
+  border-bottom: 1px solid rgb(var(--kfp-hairline));
+}
+.kfp-place-source-state-head {
+  color: rgb(var(--kfp-fg));
+  font-weight: 500;
+}
+.kfp-place-source-state-detail {
+  font-family: var(--kfp-font-mono);
+  font-size: 11px;
+}
+.kfp-place-source-state-cta {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--kfp-hairline));
+  background: rgb(var(--kfp-surface-tint) / 0.6);
+  font-family: var(--kfp-font-display);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(var(--kfp-fg));
+  cursor: pointer;
+}
+.kfp-place-source-state-cta:hover {
+  background: rgb(var(--kfp-accent) / 0.08);
+}
+
+.kfp-place-attribution {
+  padding: 8px 18px 12px;
+  font-family: var(--kfp-font-mono);
+  font-size: 10px;
+  color: rgb(var(--kfp-fg-muted));
+  letter-spacing: 0.02em;
+  border-top: 1px solid rgb(var(--kfp-hairline));
+  text-align: center;
+}
+
 /* ========== Place card (airport + navaid detail sheet) ========== */
 
 .kfp-place-card-shell {
