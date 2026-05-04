@@ -1,11 +1,20 @@
 {
+  "knosysApi": 2,
   "id": "knosys-flight-planner",
   "name": "Flight Planner",
-  "version": "0.10.0",
-  "description": "Offline VFR flight planner for GA pilots \u2014 routes, navlog, aircraft profiles, exports",
-  "author": "knosys-app",
-  "authorUrl": "https://github.com/knosys-app",
-  "minKnosysVersion": "1.0.0",
+  "version": "2.0.0",
+  "description": "Offline VFR flight planner for GA pilots — routes, navlog, aircraft profiles, exports.",
+  "author": {
+    "name": "Knosys",
+    "url": "https://github.com/knosys-app"
+  },
+  "compat": {
+    "knosys": ">=2.0.0 <3.0.0"
+  },
   "permissions": ["storage", "network", "core:locations"],
-  "main": "main.js"
+  "main": "main.js",
+  "categories": ["aviation", "planning"],
+  "homepage": "https://github.com/knosys-app/knosys-flight-planner",
+  "repository": "https://github.com/knosys-app/knosys-flight-planner",
+  "license": "MIT"
 }
