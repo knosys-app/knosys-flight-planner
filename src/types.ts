@@ -23,7 +23,58 @@ export interface PluginUIAPI {
   registerSidebarItem: (item: { id: string; title: string; icon: string; route: string; order: number }) => void;
   registerWidget: (widget: { id: string; title: string; component: ComponentType<any>; defaultSize: 'small' | 'medium' | 'large' }) => void;
   registerSettingsPanel: (panel: { id: string; component: ComponentType<any>; order?: number }) => void;
+  /**
+   * Plugin-internal flat shape — every component in this plugin still
+   * calls `api.ui.showToast(msg, type)`. The adapter in `index.tsx`
+   * shims this onto the v2 host's `api.ui.toast({...})` so we don't
+   * have to rewrite call sites.
+   */
   showToast: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
+}
+
+/**
+ * Knosys API v2 host shape (mirrors `apps/desktop/src/types/plugins.ts`).
+ * The plugin runtime hands us this; `adaptApi()` in `index.tsx` flattens
+ * it into the v1-style `PluginAPI` shape that the rest of this plugin
+ * consumes. Only the `activate()` boundary changes.
+ */
+export interface HostPluginToast {
+  message: string;
+  type?: 'info' | 'success' | 'error' | 'warning';
+  duration?: number;
+  action?: { label: string; onClick: () => void };
+  icon?: string;
+}
+
+export interface HostPluginUIAPI {
+  registerRoute: (route: { path: string; component: ComponentType<any>; children?: any[] }) => void;
+  registerSidebarItem: (item: { id: string; title: string; icon: string; route: string; order: number }) => void;
+  registerWidget: (widget: { id: string; title: string; component: ComponentType<any>; defaultSize: 'small' | 'medium' | 'large' }) => void;
+  registerSettingsPanel: (panel: { id: string; component: ComponentType<any>; order?: number }) => void;
+  toast: (toast: HostPluginToast) => void;
+}
+
+export interface HostPluginAPI {
+  pluginId: string;
+  pluginVersion: string;
+  permissions: string[];
+  hasPermission: (permission: string) => boolean;
+  storage: PluginStorageAPI;
+  core: PluginCoreAPI;
+  ui: HostPluginUIAPI;
+  network: PluginNetworkAPI;
+  theme: {
+    readonly mode: 'light' | 'dark';
+    readonly accent: string;
+    subscribe(listener: (state: { mode: 'light' | 'dark'; accent: string }) => void): () => void;
+  };
+  log: {
+    debug(...args: unknown[]): void;
+    info(...args: unknown[]): void;
+    warn(...args: unknown[]): void;
+    error(...args: unknown[]): void;
+  };
+  on: (event: string, listener: () => void) => () => void;
 }
 
 export interface PluginNetworkFetchInit {
@@ -140,6 +191,91 @@ export interface SharedDependencies {
   useRef: typeof import('react').useRef;
   cn: (...args: any[]) => string;
   lucideIcons: Record<string, ComponentType<any>>;
+}
+
+/**
+ * Knosys API v2 host shared shape. Primitives are namespaced under
+ * `kdl` and `shadcn`; the rest is the same as v1. `flatten()` in
+ * `index.tsx` collapses this into the flat `SharedDependencies` above
+ * so plugin internals can keep doing `const { Button } = Shared`.
+ */
+export interface HostSharedDependencies {
+  React: typeof import('react');
+  useNavigate: () => any;
+  hooks: { useAppData: () => any };
+  kdl: Record<string, ComponentType<any>>;
+  shadcn: {
+    Badge: ComponentType<any>;
+    Button: ComponentType<any>;
+    Calendar: ComponentType<any>;
+    Card: ComponentType<any>;
+    CardContent: ComponentType<any>;
+    CardDescription: ComponentType<any>;
+    CardFooter: ComponentType<any>;
+    CardHeader: ComponentType<any>;
+    CardTitle: ComponentType<any>;
+    Checkbox: ComponentType<any>;
+    Dialog: ComponentType<any>;
+    DialogContent: ComponentType<any>;
+    DialogDescription: ComponentType<any>;
+    DialogFooter: ComponentType<any>;
+    DialogHeader: ComponentType<any>;
+    DialogTitle: ComponentType<any>;
+    DialogTrigger: ComponentType<any>;
+    DropdownMenu: ComponentType<any>;
+    DropdownMenuContent: ComponentType<any>;
+    DropdownMenuItem: ComponentType<any>;
+    DropdownMenuLabel: ComponentType<any>;
+    DropdownMenuSeparator: ComponentType<any>;
+    DropdownMenuTrigger: ComponentType<any>;
+    Input: ComponentType<any>;
+    Label: ComponentType<any>;
+    Popover: ComponentType<any>;
+    PopoverContent: ComponentType<any>;
+    PopoverTrigger: ComponentType<any>;
+    Progress: ComponentType<any>;
+    ScrollArea: ComponentType<any>;
+    ScrollBar: ComponentType<any>;
+    Select: ComponentType<any>;
+    SelectContent: ComponentType<any>;
+    SelectItem: ComponentType<any>;
+    SelectTrigger: ComponentType<any>;
+    SelectValue: ComponentType<any>;
+    Separator: ComponentType<any>;
+    Sheet: ComponentType<any>;
+    SheetContent: ComponentType<any>;
+    SheetDescription: ComponentType<any>;
+    SheetFooter: ComponentType<any>;
+    SheetHeader: ComponentType<any>;
+    SheetTitle: ComponentType<any>;
+    SheetTrigger: ComponentType<any>;
+    Skeleton: ComponentType<any>;
+    Slider: ComponentType<any>;
+    Switch: ComponentType<any>;
+    Tabs: ComponentType<any>;
+    TabsContent: ComponentType<any>;
+    TabsList: ComponentType<any>;
+    TabsTrigger: ComponentType<any>;
+    Textarea: ComponentType<any>;
+    Tooltip: ComponentType<any>;
+    TooltipContent: ComponentType<any>;
+    TooltipProvider: ComponentType<any>;
+    TooltipTrigger: ComponentType<any>;
+  };
+  dateFns: SharedDependencies['dateFns'];
+  recharts: any;
+  ChartContainer: ComponentType<any>;
+  ChartTooltip: ComponentType<any>;
+  ChartTooltipContent: ComponentType<any>;
+  ChartLegend: ComponentType<any>;
+  ChartLegendContent: ComponentType<any>;
+  lucideIcons: Record<string, ComponentType<any>>;
+  useState: typeof import('react').useState;
+  useEffect: typeof import('react').useEffect;
+  useCallback: typeof import('react').useCallback;
+  useMemo: typeof import('react').useMemo;
+  useRef: typeof import('react').useRef;
+  cn: (...args: any[]) => string;
 }
 
 // ============================================================
