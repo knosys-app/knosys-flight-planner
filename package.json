@@ -1,6 +1,6 @@
 {
   "name": "knosys-flight-planner",
-  "version": "0.10.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,13 @@
     "build:all": "npm run build:db && npm run build:obstacles && npm run build",
     "publish:data": "tsx scripts/publish-data.ts"
   },
+  "files": [
+    "manifest.json",
+    "main.js",
+    "styles.css",
+    "LICENSE",
+    "README.md"
+  ],
   "peerDependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
